@@ -330,12 +330,6 @@ struct Session
 
 struct GUI
 {
-    // GLFW data set through custom callbacks
-    struct 
-    {
-        float vert_scroll_increments;
-    } this_frame;
-
     GLFWwindow *window;
     LineDisplay line_display = LineDisplay_Source;
     Vector<DisassemblyLine> line_disasm;
@@ -2166,10 +2160,12 @@ void Draw()
         ImGui::SetNextWindowSize(MIN_WINSIZE, ImGuiCond_Once);
         ImGui::Begin("Source", &gui.show_source, ImGuiWindowFlags_HorizontalScrollbar);
 
-        if (ImGui::IsWindowFocused() && gui.this_frame.vert_scroll_increments != 0.0f)
+        if (ImGui::IsWindowFocused() && 
+            ImGui::GetIO().KeyCtrl &&
+            ImGui::GetIO().MouseWheel != 0.0f)
         {
             // increase/decrease the font
-            float tmp = GetPinned(gui.source_font_size + gui.this_frame.vert_scroll_increments, 8.0f, 72.0f);
+            float tmp = GetPinned(gui.source_font_size + ImGui::GetIO().MouseWheel, 8.0f, 72.0f);
             if (gui.source_font_size != tmp)
             {
                 gui.change_font = true;
@@ -4636,16 +4632,6 @@ int main(int argc, char **argv)
             glfwSetWindowPos(gui.window, window_x, window_y);
         }
 
-        const auto OnScroll = [](GLFWwindow *window, double /*xoffset*/, double yoffset)
-        {
-            if (GLFW_PRESS == glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) ||
-                GLFW_PRESS == glfwGetKey(window, GLFW_KEY_RIGHT_CONTROL))
-            {
-                gui.this_frame.vert_scroll_increments = yoffset;
-            }
-        };
-        glfwSetScrollCallback(gui.window, OnScroll);
-
         const auto OnDragDrop = [](GLFWwindow* /*window*/, int count, const char** paths)
         {
             if (count == 1)
@@ -4707,7 +4693,6 @@ int main(int argc, char **argv)
             glfwWaitEvents();
         }
 
-        gui.this_frame = {};    // clear old frame data
         glfwPollEvents();
 
         if (gui.change_font)
