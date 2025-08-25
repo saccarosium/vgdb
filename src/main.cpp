@@ -2132,9 +2132,6 @@ void Draw()
 
     if (ImGui::BeginPopupModal("About Tug", &gui.show_about_tug, ImGuiWindowFlags_AlwaysAutoResize))
     {
-        ImGui::Text("Tug %d.%d.%d", TUG_VER_MAJOR, TUG_VER_MINOR, TUG_VER_PATCH);
-        ImGui::Text("Copyright (C) 2022 Kyle Sylvestre");
-
         const char *url = "https://github.com/kyle-sylvestre/Tug";
         ImColor link_color = ImColor(84, 84, 255);
         ImGui::TextColored(link_color, "%s", url);
