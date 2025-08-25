@@ -220,27 +220,6 @@ void EndProcess(pid_t p)
     }
 }
 
-void TrimWhitespace(String& str)
-{
-    // trim end
-    while (str.size() > 0) {
-        char c = str[str.size() - 1];
-        if (c == '\r' || c == '\n' || c == ' ')
-            str.pop_back();
-        else
-            break;
-    }
-
-    // trim start
-    while (str.size() > 0) {
-        char c = str[0];
-        if (c == '\r' || c == '\n' || c == ' ')
-            str.erase(str.begin(), str.begin() + 1);
-        else
-            break;
-    }
-}
-
 void ResetProgramState()
 {
     prog.local_vars.clear();
@@ -2586,7 +2565,7 @@ void Draw()
             // emulate GDB, repeat last executed command upon hitting enter on an empty line
             bool use_last_command = (input_command.size() == 0 && prog.input_cmd_offsets.size() > 0);
             String send_command = (use_last_command) ? GetInputCommand(0) : input_command;
-            TrimWhitespace(send_command);
+            std::erase_if(send_command, [](char c) { return c == '\r' || c == '\n' || c == ' '; });
             String tagged_send_command = StringPrintf("(gdb) %s", send_command.c_str());
             WriteToConsoleBuffer(tagged_send_command.c_str(),
                 tagged_send_command.size());
@@ -2601,7 +2580,7 @@ void Draw()
             static const auto PopFrontWord = [](String& str) -> String {
                 // remove the beginning word from full and return it
                 String result;
-                TrimWhitespace(str);
+                std::erase_if(str, [](char c) { return c == '\r' || c == '\n' || c == ' '; });
                 size_t space_idx = str.find(' ');
 
                 if (space_idx < str.size()) {
@@ -3764,7 +3743,7 @@ int main(int argc, char** argv)
 
         String tmp;
         if (InvokeShellCommand("which gdb", tmp)) {
-            TrimWhitespace(tmp);
+            std::erase_if(tmp, [](char c) { return c == '\r' || c == '\n' || c == ' '; });
             if (DoesFileExist(tmp.c_str(), false))
                 gdb.filename = tmp;
         }

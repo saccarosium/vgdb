@@ -392,4 +392,3 @@ bool VerifyFileExecutable(const char* filename);
 bool DoesFileExist(const char* filename, bool print_error_on_missing = true);
 bool DoesProcessExist(pid_t p);
 bool InvokeShellCommand(String command, String& output);
-void TrimWhitespace(String& str);
