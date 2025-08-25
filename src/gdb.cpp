@@ -245,7 +245,7 @@ bool GDB_StartProcess(String gdb_filename, String gdb_args)
         return false;
     }
 
-    gdb.supports_async_execution = GDB_SendBlocking("-gdb-set target-async");
+    gdb.supports_async_execution = GDB_SendBlocking("-gdb-set mi-async");
     GDB_SendBlocking("-gdb-set non-stop");
 
     //if (GDB_SendBlocking("-list-target-features", rec))
