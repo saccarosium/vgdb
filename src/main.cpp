@@ -15,6 +15,7 @@
 
 #include "common.h"
 #include "gdb.h"
+#include "gdb.cpp"
 #include "default_ini.h"
 
 #include <fstream>

@@ -20,7 +20,6 @@ endif
 
 IMGUI_DIR = ./third-party/imgui
 SOURCES = ./src/main.cpp\
-          ./src/gdb.cpp\
           $(IMGUI_DIR)/imgui.cpp\
           $(IMGUI_DIR)/imgui_draw.cpp\
           $(IMGUI_DIR)/imgui_impl_glfw.cpp\
