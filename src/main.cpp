@@ -46,7 +46,8 @@ static int InputTextCallback(ImGuiInputTextCallbackData* data)
     InputTextCallback_UserData* user_data = (InputTextCallback_UserData*)data->UserData;
     if (data->EventFlag == ImGuiInputTextFlags_CallbackResize) {
         // Resize string callback
-        // If for some reason we refuse the new length (BufTextLen) and/or capacity (BufSize) we need to set them back to what we want.
+        // If for some reason we refuse the new length (BufTextLen) and/or capacity (BufSize) we
+        // need to set them back to what we want.
         String* str = user_data->Str;
         IM_ASSERT(data->Buf == str->c_str());
         str->resize(data->BufTextLen);
@@ -59,11 +60,8 @@ static int InputTextCallback(ImGuiInputTextCallbackData* data)
     return 0;
 }
 
-bool InputText(const char* label,
-    String* str,
-    ImGuiInputTextFlags flags = 0,
-    ImGuiInputTextCallback callback = NULL,
-    void* user_data = NULL)
+bool InputText(const char* label, String* str, ImGuiInputTextFlags flags = 0,
+    ImGuiInputTextCallback callback = NULL, void* user_data = NULL)
 {
     IM_ASSERT((flags & ImGuiInputTextFlags_CallbackResize) == 0);
     flags |= ImGuiInputTextFlags_CallbackResize;
@@ -72,7 +70,8 @@ bool InputText(const char* label,
     cb_user_data.Str = str;
     cb_user_data.ChainCallback = callback;
     cb_user_data.ChainCallbackUserData = user_data;
-    return InputText(label, (char*)str->c_str(), str->capacity() + 1, flags, InputTextCallback, &cb_user_data);
+    return InputText(
+        label, (char*)str->c_str(), str->capacity() + 1, flags, InputTextCallback, &cb_user_data);
 }
 }
 
@@ -154,8 +153,7 @@ bool InvokeShellCommand(String command, String& output)
     output.clear();
     FILE* f = popen(command.c_str(), "r");
     if (f == NULL) {
-        PrintErrorf("popen shell command \"%s\" %s\n",
-            command.c_str(), GetErrorString(errno));
+        PrintErrorf("popen shell command \"%s\" %s\n", command.c_str(), GetErrorString(errno));
     } else {
         errno = 0;
         char tmp[1024] = {};
@@ -215,8 +213,7 @@ void EndProcess(pid_t p)
             if (tmp < 0) {
                 PrintErrorf("waitpid %s\n", GetErrorString(errno));
             } else if (tmp == p) {
-                Printf("ended process %d: exit code %d\n",
-                    (int)p, WEXITSTATUS(status));
+                Printf("ended process %d: exit code %d\n", (int)p, WEXITSTATUS(status));
             }
         }
     }
@@ -429,9 +426,10 @@ bool LoadFile(File& file)
                 while (i < filesize) {
                     char c0 = fd[i];
                     char c1 = (i + 1 < filesize) ? fd[i + 1] : '\0';
-                    size_t end = (c0 == '\n') ? 1 : (c0 == '\r' && c1 == '\n') ? 2
-                        : (c0 == '\r')                                         ? 1
-                                                                               : 0;
+                    size_t end = (c0 == '\n')        ? 1
+                        : (c0 == '\r' && c1 == '\n') ? 2
+                        : (c0 == '\r')               ? 1
+                                                     : 0;
 
                     if (end != 0) {
                         char* dest = lst - num_trunc;
@@ -523,7 +521,8 @@ static size_t FindOrCreateFile(const String& filename)
 
 void WriteToConsoleBuffer(const char* buf, size_t bufsize)
 {
-    bool is_mi_record = (bufsize > 0) && (buf[0] == PREFIX_ASYNC0 || buf[0] == PREFIX_ASYNC1 || buf[0] == PREFIX_RESULT);
+    bool is_mi_record = (bufsize > 0)
+        && (buf[0] == PREFIX_ASYNC0 || buf[0] == PREFIX_ASYNC1 || buf[0] == PREFIX_RESULT);
 
     if (is_mi_record && !gui.show_machine_interpreter_commands)
         return;
@@ -551,7 +550,10 @@ void WriteToConsoleBuffer(const char* buf, size_t bufsize)
             prog.log[prog.log_idx++] = c;
     };
 
-    if (bufsize > 2 && (buf[0] == PREFIX_DEBUG_LOG || buf[0] == PREFIX_TARGET_LOG || buf[0] == PREFIX_CONSOLE_LOG) && buf[1] == '\"') {
+    if (bufsize > 2
+        && (buf[0] == PREFIX_DEBUG_LOG || buf[0] == PREFIX_TARGET_LOG
+            || buf[0] == PREFIX_CONSOLE_LOG)
+        && buf[1] == '\"') {
         // console record, format ~"text text text"\n
         // skip over the beginning/ending characters
         size_t i = 2;
@@ -641,7 +643,8 @@ VarObj CreateVarObj(String name, String value = "")
 
             for (size_t i = 0; i < ctx.num_end_atoms; i++) {
                 RecordAtom* atom = &ordered_base[i];
-                if ((atom->type == Atom_Array || atom->type == Atom_Struct) && (atom->value.length != 0)) {
+                if ((atom->type == Atom_Array || atom->type == Atom_Struct)
+                    && (atom->value.length != 0)) {
                     // adjust aggregate offset
                     Assert(atom->value.index > ordered_offset);
                     atom->value.index -= ordered_offset;
@@ -649,8 +652,7 @@ VarObj CreateVarObj(String name, String value = "")
             }
 
             result.expr.atoms.resize(ctx.num_end_atoms);
-            memcpy(&result.expr.atoms[0],
-                &ctx.atoms[ctx.atoms.size() - ctx.num_end_atoms],
+            memcpy(&result.expr.atoms[0], &ctx.atoms[ctx.atoms.size() - ctx.num_end_atoms],
                 sizeof(RecordAtom) * ctx.num_end_atoms);
             result.expr.buf = value;
             result.expr_changed.resize(ctx.num_end_atoms);
@@ -658,22 +660,24 @@ VarObj CreateVarObj(String name, String value = "")
             // GDB_PrintRecordAtom(result.expr, result.expr.atoms[0], 0, out);
             //  remove format backslashes in atom strings
             //  ignore those of name "value" because these get handled in GDB_RecurseEvaluation
-            const auto RemoveStringBackslashes = [](Record& record, RecordAtom& iter, void* /* user context */) {
-                if (iter.type == Atom_String) {
-                    size_t new_length = iter.value.length;
-                    for (size_t i = 0; i < iter.value.length; i++) {
-                        size_t buf_idx = iter.value.index + i;
-                        char c = record.buf[buf_idx];
-                        char n = (i + 1 < iter.value.length) ? record.buf[buf_idx + 1] : '\0';
-                        if (c == '\\' && (n == '\\' || n == '\"')) {
-                            // record.buf[iter.value.index + new_length - 1] = ' ';
-                            memmove(&record.buf[buf_idx], &record.buf[buf_idx + 1], iter.value.length - (i + 1));
-                            new_length--;
-                        }
-                    }
-                    iter.value.length = new_length;
-                }
-            };
+            const auto RemoveStringBackslashes
+                = [](Record& record, RecordAtom& iter, void* /* user context */) {
+                      if (iter.type == Atom_String) {
+                          size_t new_length = iter.value.length;
+                          for (size_t i = 0; i < iter.value.length; i++) {
+                              size_t buf_idx = iter.value.index + i;
+                              char c = record.buf[buf_idx];
+                              char n = (i + 1 < iter.value.length) ? record.buf[buf_idx + 1] : '\0';
+                              if (c == '\\' && (n == '\\' || n == '\"')) {
+                                  // record.buf[iter.value.index + new_length - 1] = ' ';
+                                  memmove(&record.buf[buf_idx], &record.buf[buf_idx + 1],
+                                      iter.value.length - (i + 1));
+                                  new_length--;
+                              }
+                          }
+                          iter.value.length = new_length;
+                      }
+                  };
 
             if (result.expr.atoms.size() > 1)
                 IterateAtoms(result.expr, result.expr.atoms[0], RemoveStringBackslashes, NULL);
@@ -683,15 +687,17 @@ VarObj CreateVarObj(String name, String value = "")
     return result;
 }
 
-bool RecurseCheckChanged(VarObj& this_var, size_t this_parent_idx,
-    const VarObj& last_var, size_t last_parent_idx)
+bool RecurseCheckChanged(
+    VarObj& this_var, size_t this_parent_idx, const VarObj& last_var, size_t last_parent_idx)
 {
     bool changed = false;
-    Assert((this_parent_idx < this_var.expr.atoms.size()) && (last_parent_idx < last_var.expr.atoms.size()));
+    Assert((this_parent_idx < this_var.expr.atoms.size())
+        && (last_parent_idx < last_var.expr.atoms.size()));
 
     RecordAtom& this_parent = this_var.expr.atoms[this_parent_idx];
     const RecordAtom& last_parent = last_var.expr.atoms[last_parent_idx];
-    Assert((this_parent.type == Atom_Struct || this_parent.type == Atom_Array) && (this_parent.type == last_parent.type));
+    Assert((this_parent.type == Atom_Struct || this_parent.type == Atom_Array)
+        && (this_parent.type == last_parent.type));
 
     if (this_parent.value.length == last_parent.value.length) {
         size_t t_idx = this_parent.value.index;
@@ -703,20 +709,21 @@ bool RecurseCheckChanged(VarObj& this_var, size_t this_parent_idx,
             const RecordAtom& this_child = this_var.expr.atoms[t_idx];
             const RecordAtom& last_child = last_var.expr.atoms[o_idx];
             if (this_child.type == Atom_Struct || this_child.type == Atom_Array) {
-                changed |= RecurseCheckChanged(this_var, t_idx,
-                    last_var, o_idx);
+                changed |= RecurseCheckChanged(this_var, t_idx, last_var, o_idx);
             } else if (this_child.type == Atom_String) {
                 const char* this_buf = this_var.expr.buf.c_str();
                 const char* last_buf = last_var.expr.buf.c_str();
 
-                Assert(this_child.value.index + this_child.value.length <= this_var.expr.buf.size());
-                Assert(last_child.value.index + last_child.value.length <= last_var.expr.buf.size());
+                Assert(
+                    this_child.value.index + this_child.value.length <= this_var.expr.buf.size());
+                Assert(
+                    last_child.value.index + last_child.value.length <= last_var.expr.buf.size());
 
                 const char* this_text = this_buf + this_child.value.index;
                 const char* last_text = last_buf + last_child.value.index;
 
-                this_var.expr_changed[t_idx]
-                    = (this_child.value.length != last_child.value.length) || (0 != memcmp(this_text, last_text, this_child.value.length));
+                this_var.expr_changed[t_idx] = (this_child.value.length != last_child.value.length)
+                    || (0 != memcmp(this_text, last_text, this_child.value.length));
 
                 changed |= this_var.expr_changed[t_idx];
             } else {
@@ -847,15 +854,16 @@ void GetFunctionDisassembly(const Frame& frame)
         if (!gdb.has_data_disassemble_option_a) {
             return; // operation not supported, bail early
         } else {
-            // some frames don't have an associated file ex: _start function after returning from main
+            // some frames don't have an associated file ex: _start function after returning from
+            // main
             tsnprintf(tmpbuf, "-data-disassemble -a %s 0", // 0 = disasm only
                 frame.func.c_str());
         }
     } else {
         // -n -1 = disassemble all lines in the function its contained in
         // 5 = source and disasm with opcodes
-        tsnprintf(tmpbuf, "-data-disassemble -f \"%s\" -l %zu -n -1 5",
-            file.filename.c_str(), frame.line_idx + 1);
+        tsnprintf(tmpbuf, "-data-disassemble -f \"%s\" -l %zu -n -1 5", file.filename.c_str(),
+            frame.line_idx + 1);
     }
 
     GDB_SendBlocking(tmpbuf, rec);
@@ -889,8 +897,7 @@ void GetFunctionDisassembly(const Frame& frame)
                 String inst = GDB_ExtractValue("inst", line_asm_inst, rec);
                 String opcodes = GDB_ExtractValue("opcodes", line_asm_inst, rec);
 
-                tsnprintf(tmpbuf, "%s <%s+%s> %s",
-                    string_addr.c_str(), func.c_str(),
+                tsnprintf(tmpbuf, "%s <%s+%s> %s", string_addr.c_str(), func.c_str(),
                     offset_from_func.c_str(), inst.c_str());
 
                 add.addr = ParseHex(string_addr);
@@ -923,8 +930,7 @@ void GetFunctionDisassembly(const Frame& frame)
             String inst = GDB_ExtractValue("inst", line_asm_inst, rec);
             String opcodes = GDB_ExtractValue("opcodes", line_asm_inst, rec);
 
-            tsnprintf(tmpbuf, "%s <%s+%s> %s",
-                string_addr.c_str(), func.c_str(),
+            tsnprintf(tmpbuf, "%s <%s+%s> %s", string_addr.c_str(), func.c_str(),
                 offset_from_func.c_str(), inst.c_str());
 
             add.addr = ParseHex(string_addr);
@@ -951,8 +957,7 @@ void RecurseSetNodeState(const Record& rec, size_t atom_idx, int state, String n
 }
 
 // draw an aggregate data type in the form of a two column table
-void RecurseExpressionTreeNodes(const VarObj& var, size_t atom_idx,
-    size_t parent_array_index = 0)
+void RecurseExpressionTreeNodes(const VarObj& var, size_t atom_idx, size_t parent_array_index = 0)
 {
     char tmpbuf[4096];
     const Record& src = var.expr;
@@ -961,8 +966,8 @@ void RecurseExpressionTreeNodes(const VarObj& var, size_t atom_idx,
     Assert(parent.value.length > 0);
 
     if (parent.name.length != 0) {
-        tsnprintf(tmpbuf, "%.*s##%zu", (int)parent.name.length,
-            &src.buf[parent.name.index], atom_idx);
+        tsnprintf(
+            tmpbuf, "%.*s##%zu", (int)parent.name.length, &src.buf[parent.name.index], atom_idx);
     } else {
         tsnprintf(tmpbuf, "[%zu]", parent_array_index);
     }
@@ -984,9 +989,7 @@ void RecurseExpressionTreeNodes(const VarObj& var, size_t atom_idx,
         if (iter.type == Atom_Struct || iter.type == Atom_Array) {
             iter_idx = iter.value.index;
         } else if (iter.type == Atom_String) {
-            string_start_idx = (iter.name.index != 0)
-                ? iter.name.index
-                : iter.value.index;
+            string_start_idx = (iter.name.index != 0) ? iter.name.index : iter.value.index;
             break;
         }
     }
@@ -1008,11 +1011,9 @@ void RecurseExpressionTreeNodes(const VarObj& var, size_t atom_idx,
     // set the right column value text of the aggregate tree node
     size_t preview_count = GetMin(string_end_idx - string_start_idx, 40);
     ImGui::TableNextColumn();
-    ImColor preview_color = (var.expr_changed[atom_idx])
-        ? IM_COL32_WIN_RED
-        : ImGui::GetStyleColorVec4(ImGuiCol_Text);
-    ImGui::TextColored(preview_color, "%.*s", (int)preview_count,
-        &src.buf[string_start_idx]);
+    ImColor preview_color
+        = (var.expr_changed[atom_idx]) ? IM_COL32_WIN_RED : ImGui::GetStyleColorVec4(ImGuiCol_Text);
+    ImGui::TextColored(preview_color, "%.*s", (int)preview_count, &src.buf[string_start_idx]);
 
     if (tree_node_clicked) {
         if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
@@ -1029,18 +1030,16 @@ void RecurseExpressionTreeNodes(const VarObj& var, size_t atom_idx,
                 ImGui::TableNextRow();
                 ImGui::TableNextColumn();
                 if (child.name.length > 0) {
-                    ImGui::Text("%.*s", (int)child.name.length,
-                        &src.buf[child.name.index]);
+                    ImGui::Text("%.*s", (int)child.name.length, &src.buf[child.name.index]);
                 } else {
                     ImGui::Text("[%zu]", array_index);
                 }
 
-                ImColor color = (var.expr_changed[i])
-                    ? IM_COL32_WIN_RED
-                    : ImGui::GetStyleColorVec4(ImGuiCol_Text);
+                ImColor color = (var.expr_changed[i]) ? IM_COL32_WIN_RED
+                                                      : ImGui::GetStyleColorVec4(ImGuiCol_Text);
                 ImGui::TableNextColumn();
-                ImGui::TextColored(color, "%.*s", (int)child.value.length,
-                    &src.buf[child.value.index]);
+                ImGui::TextColored(
+                    color, "%.*s", (int)child.value.length, &src.buf[child.value.index]);
             }
 
             array_index++;
@@ -1048,14 +1047,12 @@ void RecurseExpressionTreeNodes(const VarObj& var, size_t atom_idx,
 
         ImGui::TreePop();
     } else if (ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
-        String name = String(src.buf.c_str() + parent.name.index,
-            parent.name.length);
+        String name = String(src.buf.c_str() + parent.name.index, parent.name.length);
         // TODO fix empty names RecurseSetNodeState(src, atom_idx, 1, name);
     }
 
     if (close_after) {
-        String name = String(src.buf.c_str() + parent.name.index,
-            parent.name.length);
+        String name = String(src.buf.c_str() + parent.name.index, parent.name.length);
         // TODO fix empty names RecurseSetNodeState(src, atom_idx, 0, name);
     }
 }
@@ -1127,7 +1124,9 @@ void QueryFrame(bool force_clear_locals)
                 // same as what GDB does in source-cache.c
                 struct stat source_st = {};
                 struct stat exe_st = {};
-                if (DoesFileExist(file.filename.c_str(), false) && (0 > stat(file.filename.c_str(), &source_st) || 0 > stat(gdb.debug_filename.c_str(), &exe_st))) {
+                if (DoesFileExist(file.filename.c_str(), false)
+                    && (0 > stat(file.filename.c_str(), &source_st)
+                        || 0 > stat(gdb.debug_filename.c_str(), &exe_st))) {
                     PrintErrorf("stat %s\n", GetErrorString(errno));
                 } else {
                     time_t src = source_st.st_mtime;
@@ -1170,8 +1169,8 @@ void QueryFrame(bool force_clear_locals)
                 // the only difference is GLOBAL_NAME_PREFIX and '@' used to signify a varobj
                 // that lasts the duration of the program
 
-                String str = StringPrintf("-var-create " GLOBAL_NAME_PREFIX "%s @ $%s",
-                    registers[i], registers[i]);
+                String str = StringPrintf(
+                    "-var-create " GLOBAL_NAME_PREFIX "%s @ $%s", registers[i], registers[i]);
                 if (GDB_SendBlocking(str.c_str(), rec)) {
                     VarObj add = CreateVarObj(registers[i], GDB_ExtractValue("value", rec));
                     prog.global_vars.emplace_back(add);
@@ -1184,7 +1183,8 @@ void QueryFrame(bool force_clear_locals)
     // prog.local_vars not actually GDB variable objects,
     // problems with aggregates displaying updates
 
-    tsnprintf(tmpbuf, "-stack-list-variables --frame %zu --thread %d --all-values", prog.frame_idx, GetActiveThreadID());
+    tsnprintf(tmpbuf, "-stack-list-variables --frame %zu --thread %d --all-values", prog.frame_idx,
+        GetActiveThreadID());
     GDB_SendBlocking(tmpbuf, rec);
     for (VarObj& local : prog.local_vars)
         local.changed = false;
@@ -1194,8 +1194,8 @@ void QueryFrame(bool force_clear_locals)
     Vector<bool> var_found(start_locals_length);
 
     for (const RecordAtom& child : GDB_IterChild(rec, vars)) {
-        VarObj incoming = CreateVarObj(GDB_ExtractValue("name", child, rec),
-            GDB_ExtractValue("value", child, rec));
+        VarObj incoming = CreateVarObj(
+            GDB_ExtractValue("name", child, rec), GDB_ExtractValue("value", child, rec));
 
         bool found = false;
         for (size_t i = start_locals_length - 1; i < start_locals_length; i--) {
@@ -1220,8 +1220,7 @@ void QueryFrame(bool force_clear_locals)
     // remove any locals that went out of scope
     for (size_t i = var_found.size() - 1; i < var_found.size(); i--) {
         if (!var_found[i])
-            prog.local_vars.erase(prog.local_vars.begin() + i,
-                prog.local_vars.begin() + i + 1);
+            prog.local_vars.erase(prog.local_vars.begin() + i, prog.local_vars.begin() + i + 1);
     }
 
     // update global values, just registers right now
@@ -1231,8 +1230,8 @@ void QueryFrame(bool force_clear_locals)
         global.changed = false;
 
     for (const RecordAtom& iter : GDB_IterChild(rec, changelist)) {
-        VarObj incoming = CreateVarObj(GDB_ExtractValue("name", iter, rec),
-            GDB_ExtractValue("value", iter, rec));
+        VarObj incoming = CreateVarObj(
+            GDB_ExtractValue("name", iter, rec), GDB_ExtractValue("value", iter, rec));
 
         const char* srcname = incoming.name.c_str();
         const char* namestart = strstr(srcname, GLOBAL_NAME_PREFIX);
@@ -1286,7 +1285,8 @@ void Draw()
     Record rec;
     char tmpbuf[4096];
     const ImVec2 MIN_WINSIZE = ImVec2(350.0f, 250.0f);
-    const ImGuiTableFlags TABLE_FLAGS = ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY | ImGuiTableFlags_Resizable | ImGuiTableFlags_BordersInner;
+    const ImGuiTableFlags TABLE_FLAGS = ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY
+        | ImGuiTableFlags_Resizable | ImGuiTableFlags_BordersInner;
 
     // check for new blocks
     int recv_block_semvalue = 0;
@@ -1335,8 +1335,7 @@ void Draw()
                     auto& bpts = prog.breakpoints;
                     for (size_t b = 0; b < bpts.size(); b++) {
                         if (bpts[b].number == id) {
-                            bpts.erase(bpts.begin() + b,
-                                bpts.begin() + b + 1);
+                            bpts.erase(bpts.begin() + b, bpts.begin() + b + 1);
                             break;
                         }
                     }
@@ -1347,8 +1346,8 @@ void Draw()
                     for (size_t end = prog.threads.size(); end > 0; end--) {
                         size_t t = end - 1;
                         if (prog.threads[t].group_id == group_id) {
-                            prog.threads.erase(prog.threads.begin() + t,
-                                prog.threads.begin() + t + 1);
+                            prog.threads.erase(
+                                prog.threads.begin() + t, prog.threads.begin() + t + 1);
                             break;
                         }
                     }
@@ -1379,8 +1378,8 @@ void Draw()
                     String group_id = GDB_ExtractValue("group-id", parse_rec);
                     for (size_t t = 0; t < prog.threads.size(); t++) {
                         if (prog.threads[t].id == id && prog.threads[t].group_id == group_id) {
-                            prog.threads.erase(prog.threads.begin() + t,
-                                prog.threads.begin() + t + 1);
+                            prog.threads.erase(
+                                prog.threads.begin() + t, prog.threads.begin() + t + 1);
                             break;
                         }
                     }
@@ -1416,7 +1415,8 @@ void Draw()
                 String reason = GDB_ExtractValue("reason", parse_rec);
                 int tid = GDB_ExtractInt("thread-id", parse_rec);
 
-                // wonky: sometimes it's stopped-threads="all", and sometimes it's stopped-threads=["all"]
+                // wonky: sometimes it's stopped-threads="all", and sometimes it's
+                // stopped-threads=["all"]
                 bool stopped_all = false;
                 const RecordAtom* stopped_threads = GDB_ExtractAtom("stopped-threads", parse_rec);
                 if (stopped_threads != NULL) {
@@ -1532,7 +1532,8 @@ void Draw()
                 pick_debug_file = true;
             ImGui::InputText("debug arguments", debug_args, sizeof(debug_args));
 
-            if ((pick_gdb_file || pick_debug_file) && ImGuiFileWindow(ctx, ImGuiFileWindowMode_SelectFile)) {
+            if ((pick_gdb_file || pick_debug_file)
+                && ImGuiFileWindow(ctx, ImGuiFileWindowMode_SelectFile)) {
                 if (ctx.selected) {
                     if (pick_gdb_file)
                         tsnprintf(gdb_filename, "%s", ctx.path.c_str());
@@ -1546,9 +1547,8 @@ void Draw()
 
             if (ImGui::BeginCombo("debug history", "")) {
                 for (Session& iter : gui.session_history) {
-                    String str = StringPrintf("%s %s",
-                        iter.debug_exe.c_str(),
-                        iter.debug_args.c_str());
+                    String str
+                        = StringPrintf("%s %s", iter.debug_exe.c_str(), iter.debug_args.c_str());
                     if (ImGui::Selectable(str.c_str())) {
                         tsnprintf(debug_filename, "%s", iter.debug_exe.c_str());
                         tsnprintf(debug_args, "%s", iter.debug_args.c_str());
@@ -1573,7 +1573,8 @@ void Draw()
                     GDB_StartProcess(gdb_filename, gdb_args);
                 }
 
-                if (gdb.spawned_pid != 0 && GDB_SetInferiorExe(debug_filename) && GDB_SetInferiorArgs(debug_args)) {
+                if (gdb.spawned_pid != 0 && GDB_SetInferiorExe(debug_filename)
+                    && GDB_SetInferiorArgs(debug_args)) {
                     if (gdb.has_exec_run_start)
                         GDB_SendBlocking("-exec-run --start");
 
@@ -1591,7 +1592,8 @@ void Draw()
                             has_session_changed = true;
                         } else {
                             Session& newest = gui.session_history[0];
-                            if (newest.debug_exe != s.debug_exe || newest.debug_args != s.debug_args) {
+                            if (newest.debug_exe != s.debug_exe
+                                || newest.debug_args != s.debug_args) {
                                 has_session_changed = true;
                             }
                         }
@@ -1658,11 +1660,11 @@ void Draw()
             // line display: how to present the debugged executable:
             LineDisplay last_line_display = gui.line_display;
             ImGui::SetNextItemWidth(160.0f);
-            ImGui::Combo("View Files As...##Settings",
-                reinterpret_cast<int*>(&gui.line_display),
+            ImGui::Combo("View Files As...##Settings", reinterpret_cast<int*>(&gui.line_display),
                 "Source\0Disassembly\0Source And Disassembly\0");
 
-            if (last_line_display == LineDisplay_Source && gui.line_display != LineDisplay_Source && prog.frame_idx < prog.frames.size()) {
+            if (last_line_display == LineDisplay_Source && gui.line_display != LineDisplay_Source
+                && prog.frame_idx < prog.frames.size()) {
                 // query the disassembly for this function
                 GetFunctionDisassembly(prog.frames[prog.frame_idx]);
             }
@@ -1681,7 +1683,8 @@ void Draw()
             }
 
             if (ImGui::Checkbox("Use Default Font (Liberation Mono)", &gui.use_default_font)) {
-                if (gui.use_default_font || (gui.font_filename != "" && DoesFileExist(gui.font_filename.c_str()))) {
+                if (gui.use_default_font
+                    || (gui.font_filename != "" && DoesFileExist(gui.font_filename.c_str()))) {
                     gui.change_font = true;
                 }
             }
@@ -1689,7 +1692,8 @@ void Draw()
             float fsz = gui.font_size;
             bool changed_font_point = false;
             ImGuiDisabled(!gui.use_default_font && gui.font_filename == "",
-                changed_font_point = ImGui::InputFloat("Font Size", &fsz, 1.0f, 0.0f, "%.0f", ImGuiInputTextFlags_EnterReturnsTrue));
+                changed_font_point = ImGui::InputFloat(
+                    "Font Size", &fsz, 1.0f, 0.0f, "%.0f", ImGuiInputTextFlags_EnterReturnsTrue));
             if (changed_font_point) {
                 gui.font_size = GetPinned(fsz, MIN_FONT_SIZE, MAX_FONT_SIZE);
                 gui.source_font_size = gui.font_size;
@@ -1699,17 +1703,21 @@ void Draw()
             float sfsz = gui.source_font_size;
             bool changed_source_font_point = false;
             ImGuiDisabled(!gui.use_default_font && gui.font_filename == "",
-                changed_source_font_point = ImGui::InputFloat("Source Font Size", &sfsz, 1.0f, 0.0f, "%.0f", ImGuiInputTextFlags_EnterReturnsTrue));
+                changed_source_font_point = ImGui::InputFloat("Source Font Size", &sfsz, 1.0f, 0.0f,
+                    "%.0f", ImGuiInputTextFlags_EnterReturnsTrue));
             if (changed_source_font_point) {
                 gui.source_font_size = GetPinned(sfsz, MIN_FONT_SIZE, MAX_FONT_SIZE);
                 gui.change_font = true;
             }
 
-            ImGuiDisabled(gui.use_default_font, changed_font_filename = ImGui::InputText("Font Filename", font_filename, sizeof(font_filename), ImGuiInputTextFlags_EnterReturnsTrue));
+            ImGuiDisabled(gui.use_default_font,
+                changed_font_filename = ImGui::InputText("Font Filename", font_filename,
+                    sizeof(font_filename), ImGuiInputTextFlags_EnterReturnsTrue));
             ImGui::SameLine();
             ImGuiDisabled(gui.use_default_font, show_font_picker |= ImGui::Button("...##font"));
 
-            if (show_font_picker && ImGuiFileWindow(ctx, ImGuiFileWindowMode_SelectFile, ".", "ttf,otf")) {
+            if (show_font_picker
+                && ImGuiFileWindow(ctx, ImGuiFileWindowMode_SelectFile, ".", "ttf,otf")) {
                 show_font_picker = false;
                 if (ctx.selected) {
                     changed_font_filename = true;
@@ -1721,7 +1729,8 @@ void Draw()
                 bool good_font = false;
                 if (DoesFileExist(font_filename)) {
                     const char* ext = strrchr(font_filename, '.');
-                    if (ext == NULL || !(0 == strcasecmp(ext, ".otf") || 0 == strcasecmp(ext, ".ttf"))) {
+                    if (ext == NULL
+                        || !(0 == strcasecmp(ext, ".otf") || 0 == strcasecmp(ext, ".ttf"))) {
                         PrintError("invalid font, choose .otf or .ttf file\n");
                     } else {
                         good_font = true;
@@ -1735,11 +1744,13 @@ void Draw()
             }
 
             int temp_theme = gui.window_theme;
-            if (ImGui::Combo("Window Theme##Settings", &temp_theme, "Light\0Dark Purple\0Dark Blue\0"))
+            if (ImGui::Combo(
+                    "Window Theme##Settings", &temp_theme, "Light\0Dark Purple\0Dark Blue\0"))
                 SetWindowTheme((WindowTheme)temp_theme);
 
             static int temp_hover_delay_ms = gui.hover_delay_ms;
-            if (ImGui::InputInt("Hover Delay", &temp_hover_delay_ms, 1, 1, ImGuiInputTextFlags_EnterReturnsTrue)) {
+            if (ImGui::InputInt("Hover Delay", &temp_hover_delay_ms, 1, 1,
+                    ImGuiInputTextFlags_EnterReturnsTrue)) {
                 gui.hover_delay_ms = temp_hover_delay_ms;
             }
 
@@ -1758,9 +1769,9 @@ void Draw()
             for (RegisterName& reg : all_registers) {
                 if (ImGui::Checkbox(reg.text.c_str(), &reg.registered)) {
                     if (reg.registered) {
-                        // add register varobj, copied from var creation in async_stopped if statement
-                        // the only difference is GLOBAL_NAME_PREFIX and '@' used to signify a varobj
-                        // that lasts the duration of the program
+                        // add register varobj, copied from var creation in async_stopped if
+                        // statement the only difference is GLOBAL_NAME_PREFIX and '@' used to
+                        // signify a varobj that lasts the duration of the program
 
                         tsnprintf(tmpbuf, "-var-create " GLOBAL_NAME_PREFIX "%s @ $%s",
                             reg.text.c_str(), reg.text.c_str());
@@ -1772,7 +1783,8 @@ void Draw()
                         // delete register varobj
                         for (size_t i = 0; i < prog.global_vars.size(); i++) {
                             if (prog.global_vars[i].name == reg.text) {
-                                tsnprintf(tmpbuf, "-var-delete " GLOBAL_NAME_PREFIX "%s", reg.text.c_str());
+                                tsnprintf(tmpbuf, "-var-delete " GLOBAL_NAME_PREFIX "%s",
+                                    reg.text.c_str());
                                 if (GDB_SendBlocking(tmpbuf)) {
                                     prog.global_vars.erase(prog.global_vars.begin() + i,
                                         prog.global_vars.begin() + i + 1);
@@ -1794,7 +1806,8 @@ void Draw()
         gui.show_about_tug = true;
     }
 
-    if (ImGui::BeginPopupModal("About Tug", &gui.show_about_tug, ImGuiWindowFlags_AlwaysAutoResize)) {
+    if (ImGui::BeginPopupModal(
+            "About Tug", &gui.show_about_tug, ImGuiWindowFlags_AlwaysAutoResize)) {
         const char* url = "https://github.com/kyle-sylvestre/Tug";
         ImColor link_color = ImColor(84, 84, 255);
         ImGui::TextColored(link_color, "%s", url);
@@ -1813,11 +1826,13 @@ void Draw()
         float saved_frame_border_size = ImGui::GetStyle().FrameBorderSize;
         ImGui::GetStyle().FrameBorderSize = 0.0f; // disable line border around breakpoints
         ImGui::PushFont(gui.source_font);
-        ImGui::SetNextWindowBgAlpha(1.0); // @Imgui: bug where GetStyleColor doesn't respect window opacity
+        ImGui::SetNextWindowBgAlpha(
+            1.0); // @Imgui: bug where GetStyleColor doesn't respect window opacity
         ImGui::SetNextWindowSize(MIN_WINSIZE, ImGuiCond_Once);
         ImGui::Begin("Source", &gui.show_source, ImGuiWindowFlags_HorizontalScrollbar);
 
-        if (ImGui::IsWindowFocused() && ImGui::GetIO().KeyCtrl && ImGui::GetIO().MouseWheel != 0.0f) {
+        if (ImGui::IsWindowFocused() && ImGui::GetIO().KeyCtrl
+            && ImGui::GetIO().MouseWheel != 0.0f) {
             // increase/decrease the font
             float tmp = GetPinned(gui.source_font_size + ImGui::GetIO().MouseWheel, 8.0f, 72.0f);
             if (gui.source_font_size != tmp) {
@@ -1864,7 +1879,8 @@ void Draw()
                 if (IsKeyPressed(ImGuiKey_Escape))
                     goto_line_open = false;
 
-                if (ImGui::InputInt("##goto_line", &goto_line_idx, 1, 1, ImGuiInputTextFlags_EnterReturnsTrue)) {
+                if (ImGui::InputInt("##goto_line", &goto_line_idx, 1, 1,
+                        ImGuiInputTextFlags_EnterReturnsTrue)) {
                     size_t linecount = prog.files[prog.file_idx].lines.size();
                     if (goto_line_idx < 0)
                         goto_line_idx = 0;
@@ -1883,9 +1899,8 @@ void Draw()
         //
 
         if (gui.source_search_bar_open) {
-            ImGui::InputText("##source_search",
-                gui.source_search_keyword,
-                sizeof(gui.source_search_keyword));
+            ImGui::InputText(
+                "##source_search", gui.source_search_keyword, sizeof(gui.source_search_keyword));
             if (prog.file_idx < prog.files.size()) {
                 size_t dir = 1;
                 const File& this_file = prog.files[prog.file_idx];
@@ -1905,8 +1920,7 @@ void Draw()
                 // search for a keyword starting at the last found index + 1
                 bool wraparound = false;
                 gui.source_found_line = false;
-                for (size_t i = gui.source_found_line_idx;
-                    i < this_file.lines.size(); i += dir) {
+                for (size_t i = gui.source_found_line_idx; i < this_file.lines.size(); i += dir) {
                     const String& line = GetLine(this_file, i);
                     if (NULL != strstr(line.c_str(), gui.source_search_keyword)) {
                         gui.source_found_line = true;
@@ -1946,7 +1960,8 @@ void Draw()
             // set the max horizontal scrollbar size
             String longest = GetLine(file, file.longest_line_idx);
             float start_curpos_x = ImGui::GetCursorPosX();
-            ImGui::SetCursorPosX(start_curpos_x + ImGui::CalcTextSize(longest.data(), longest.data() + longest.size()).x);
+            ImGui::SetCursorPosX(start_curpos_x
+                + ImGui::CalcTextSize(longest.data(), longest.data() + longest.size()).x);
             ImGui::Text("foobarbaz");
 
             // reset the draw position
@@ -1956,7 +1971,8 @@ void Draw()
             // @Optimization: only draw the visible lines then SetCursorPosY to
             // be lineheight * height per line to set the total scroll
             if (gui.line_display == LineDisplay_Source) {
-                bool in_active_frame_file = prog.frame_idx < prog.frames.size() && prog.frames[prog.frame_idx].file_idx == prog.file_idx;
+                bool in_active_frame_file = prog.frame_idx < prog.frames.size()
+                    && prog.frames[prog.frame_idx].file_idx == prog.file_idx;
 
                 // automatically scroll to the next executed line if it is far enough away
                 // and we've just stopped execution
@@ -1967,7 +1983,8 @@ void Draw()
                     case Jump_Stopped: {
                         if (in_active_frame_file) {
                             const Frame& frame = prog.frames[prog.frame_idx];
-                            bool is_next_exec_visible = frame.line_idx >= start_idx + 5 && frame.line_idx <= start_idx + perscreen - 5;
+                            bool is_next_exec_visible = frame.line_idx >= start_idx + 5
+                                && frame.line_idx <= start_idx + perscreen - 5;
                             if (!is_next_exec_visible)
                                 middle_idx = frame.line_idx;
                         }
@@ -1978,7 +1995,8 @@ void Draw()
                     } break;
 
                     case Jump_Search: {
-                        bool is_found_visible = gui.source_found_line_idx >= start_idx && gui.source_found_line_idx < start_idx + perscreen;
+                        bool is_found_visible = gui.source_found_line_idx >= start_idx
+                            && gui.source_found_line_idx < start_idx + perscreen;
 
                         if (!is_found_visible)
                             middle_idx = gui.source_found_line_idx;
@@ -2035,18 +2053,14 @@ void Draw()
                         bkpt_hovered_color.Value.w = 0.3f;
                     }
 
-                    ImGui::PushStyleColor(ImGuiCol_FrameBg,
-                        window_bg_color.Value);
-                    ImGui::PushStyleColor(ImGuiCol_FrameBgHovered,
-                        bkpt_hovered_color.Value);
+                    ImGui::PushStyleColor(ImGuiCol_FrameBg, window_bg_color.Value);
+                    ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, bkpt_hovered_color.Value);
 
                     // color while pressing mouse left on button
-                    ImGui::PushStyleColor(ImGuiCol_FrameBgActive,
-                        bkpt_active_color.Value);
+                    ImGui::PushStyleColor(ImGuiCol_FrameBgActive, bkpt_active_color.Value);
 
                     // color while active
-                    ImGui::PushStyleColor(ImGuiCol_CheckMark,
-                        bkpt_active_color.Value);
+                    ImGui::PushStyleColor(ImGuiCol_CheckMark, bkpt_active_color.Value);
 
                     tsnprintf(tmpbuf, "##bkpt%zu", line_idx);
                     if (ImGui::RadioButton(tmpbuf, is_breakpoint_on_line)) {
@@ -2073,8 +2087,8 @@ void Draw()
                             }
                         } else {
                             // create breakpoint
-                            tsnprintf(tmpbuf, "-break-insert \"%s:%d\"",
-                                file.filename.c_str(), (int)(line_idx + 1));
+                            tsnprintf(tmpbuf, "-break-insert \"%s:%d\"", file.filename.c_str(),
+                                (int)(line_idx + 1));
                             if (GDB_SendBlocking(tmpbuf, rec)) {
                                 Breakpoint bkpt = ExtractBreakpoint(rec);
                                 prog.breakpoints.push_back(bkpt);
@@ -2086,7 +2100,8 @@ void Draw()
                                 // add console message matching what GDB would send
                                 // Breakpoint 2 at 0x555555555185: file debug.c, line 13.
                                 Printf("Breakpoint %d at 0x%" PRIx64 ": file %s, line %d",
-                                    (int)bkpt.number, bkpt.addr, filename, (int)(bkpt.line_idx + 1));
+                                    (int)bkpt.number, bkpt.addr, filename,
+                                    (int)(bkpt.line_idx + 1));
                             }
                         }
                     }
@@ -2100,14 +2115,14 @@ void Draw()
                         line_written = sizeof(tmpbuf) - 1;
 
                     ImVec2 textstart = ImGui::GetCursorPos();
-                    textstart.x += ImGui::CalcTextSize(tmpbuf, tmpbuf + line_written - line.size()).x; // skip line number for hover eval
+                    textstart.x += ImGui::CalcTextSize(tmpbuf, tmpbuf + line_written - line.size())
+                                       .x; // skip line number for hover eval
 
                     if (in_active_frame_file && line_idx == prog.frames[prog.frame_idx].line_idx) {
                         // prevent any "##" text from being hidden
                         if (line_written < (int)sizeof(tmpbuf))
-                            snprintf(tmpbuf + line_written,
-                                sizeof(tmpbuf) - line_written,
-                                "##%zu", line_idx);
+                            snprintf(tmpbuf + line_written, sizeof(tmpbuf) - line_written, "##%zu",
+                                line_idx);
                         ImGui::Selectable(tmpbuf, !prog.running);
                     } else {
                         if (gui.source_search_bar_open && line_idx == gui.source_found_line_idx) {
@@ -2120,7 +2135,8 @@ void Draw()
                     if (ImGui::IsItemHovered()) {
                         // convert absolute mouse to window relative position
                         ImVec2 relpos = {};
-                        relpos.x = ImGui::GetMousePos().x - ImGui::GetWindowPos().x + ImGui::GetScrollX();
+                        relpos.x = ImGui::GetMousePos().x - ImGui::GetWindowPos().x
+                            + ImGui::GetScrollX();
                         relpos.y = ImGui::GetMousePos().y - ImGui::GetWindowPos().y;
 
                         // enumerate words of the line
@@ -2128,7 +2144,8 @@ void Draw()
                         size_t delim_idx = BAD_INDEX;
                         for (size_t char_idx = 0; char_idx < line.size(); char_idx++) {
                             char c = line[char_idx];
-                            bool is_ident = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (word_idx != BAD_INDEX && (c >= '0' && c <= '9')) || (c == '_');
+                            bool is_ident = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+                                || (word_idx != BAD_INDEX && (c >= '0' && c <= '9')) || (c == '_');
 
                             if (char_idx == line.size() - 1 && is_ident) {
                                 // force a word on the last index
@@ -2144,11 +2161,13 @@ void Draw()
                                 if (word_idx != BAD_INDEX) {
                                     // we got a word delimited by spaces
                                     // calculate size and see if mouse is over it
-                                    ImVec2 worddim = ImGui::CalcTextSize(line.data() + word_idx,
-                                        line.data() + char_idx);
-                                    if (relpos.x >= textstart.x && relpos.x <= textstart.x + worddim.x && prog.started) {
+                                    ImVec2 worddim = ImGui::CalcTextSize(
+                                        line.data() + word_idx, line.data() + char_idx);
+                                    if (relpos.x >= textstart.x
+                                        && relpos.x <= textstart.x + worddim.x && prog.started) {
                                         // query a word if we moved words / callstack frames
-                                        // TODO: register hover needs '$' in front of name for asm debugging
+                                        // TODO: register hover needs '$' in front of name for asm
+                                        // debugging
                                         static size_t hover_line_idx;
                                         static size_t hover_word_idx;
                                         static size_t hover_char_idx;
@@ -2161,13 +2180,17 @@ void Draw()
                                         // check to see if we should add the variable
                                         // to the watch variables
                                         if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
-                                            String hover_string(line.data() + word_idx, char_idx - word_idx);
+                                            String hover_string(
+                                                line.data() + word_idx, char_idx - word_idx);
                                             VarObj add = CreateVarObj(hover_string);
                                             prog.watch_vars.push_back(add);
                                             QueryWatchlist();
                                         }
 
-                                        if (hover_word_idx != word_idx || hover_char_idx != char_idx || hover_line_idx != line_idx || hover_num_frames != prog.frames.size() || hover_frame_idx != prog.frame_idx) {
+                                        if (hover_word_idx != word_idx || hover_char_idx != char_idx
+                                            || hover_line_idx != line_idx
+                                            || hover_num_frames != prog.frames.size()
+                                            || hover_frame_idx != prog.frame_idx) {
                                             hover_word_idx = word_idx;
                                             hover_char_idx = char_idx;
                                             hover_line_idx = line_idx;
@@ -2179,11 +2202,16 @@ void Draw()
                                         }
 
                                         if (!hover_value_evaluated) {
-                                            if (ImGui::GetTime() - hover_time > (gui.hover_delay_ms / 1000.0)) {
+                                            if (ImGui::GetTime() - hover_time
+                                                > (gui.hover_delay_ms / 1000.0)) {
                                                 hover_value_evaluated = true;
-                                                String word(line.data() + word_idx, char_idx - word_idx);
-                                                tsnprintf(tmpbuf, "-data-evaluate-expression --frame %zu --thread %d \"%s\"",
-                                                    prog.frame_idx, GetActiveThreadID(), word.c_str());
+                                                String word(
+                                                    line.data() + word_idx, char_idx - word_idx);
+                                                tsnprintf(tmpbuf,
+                                                    "-data-evaluate-expression --frame %zu "
+                                                    "--thread %d \"%s\"",
+                                                    prog.frame_idx, GetActiveThreadID(),
+                                                    word.c_str());
                                                 if (GDB_SendBlocking(tmpbuf, rec)) {
                                                     hover_value = GDB_ExtractValue("value", rec);
                                                 }
@@ -2203,7 +2231,8 @@ void Draw()
                                     if (char_idx + 1 < line.size())
                                         n = line[char_idx + 1];
 
-                                    // C/C++: skip over struct syntax chars to evaluate their members
+                                    // C/C++: skip over struct syntax chars to evaluate their
+                                    // members
                                     if (c == '.') {
                                         char_idx += 1;
                                         not_delim_struct = false;
@@ -2224,8 +2253,8 @@ void Draw()
                             } else if (word_idx == BAD_INDEX) {
                                 if (delim_idx != BAD_INDEX) {
                                     // advance non-ident text width
-                                    ImVec2 dim = ImGui::CalcTextSize(line.data() + delim_idx,
-                                        line.data() + char_idx);
+                                    ImVec2 dim = ImGui::CalcTextSize(
+                                        line.data() + delim_idx, line.data() + char_idx);
                                     textstart.x += dim.x;
                                 }
                                 word_idx = char_idx;
@@ -2234,7 +2263,10 @@ void Draw()
                         }
                     }
                 }
-            } else if ((gui.line_display == LineDisplay_Disassembly || gui.line_display == LineDisplay_Source_And_Disassembly) && prog.frame_idx < prog.frames.size() && prog.frames[prog.frame_idx].file_idx == prog.file_idx) {
+            } else if ((gui.line_display == LineDisplay_Disassembly
+                           || gui.line_display == LineDisplay_Source_And_Disassembly)
+                && prog.frame_idx < prog.frames.size()
+                && prog.frames[prog.frame_idx].file_idx == prog.file_idx) {
                 const Frame& frame = prog.frames[prog.frame_idx];
                 // automatically scroll to the next executed line if it is far enough away
                 // and we've just stopped execution
@@ -2293,18 +2325,14 @@ void Draw()
                     bkpt_hovered_color.Value.z = window_bg_color.Value.z + inc;
                     bkpt_hovered_color.Value.w = window_bg_color.Value.w;
 
-                    ImGui::PushStyleColor(ImGuiCol_FrameBg,
-                        window_bg_color.Value);
-                    ImGui::PushStyleColor(ImGuiCol_FrameBgHovered,
-                        bkpt_hovered_color.Value);
+                    ImGui::PushStyleColor(ImGuiCol_FrameBg, window_bg_color.Value);
+                    ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, bkpt_hovered_color.Value);
 
                     // color while pressing mouse left on button
-                    ImGui::PushStyleColor(ImGuiCol_FrameBgActive,
-                        bkpt_active_color.Value);
+                    ImGui::PushStyleColor(ImGuiCol_FrameBgActive, bkpt_active_color.Value);
 
                     // color while active
-                    ImGui::PushStyleColor(ImGuiCol_CheckMark,
-                        bkpt_active_color.Value);
+                    ImGui::PushStyleColor(ImGuiCol_CheckMark, bkpt_active_color.Value);
 
                     tsnprintf(tmpbuf, "##bkpt%d", (int)i);
                     if (ImGui::RadioButton(tmpbuf, is_breakpoint_set)) {
@@ -2369,7 +2397,8 @@ void Draw()
                 if (scroll_dir != 0) {
                     timeval tv = {};
                     gettimeofday(&tv, NULL); // get current time
-                    double ms = (tv.tv_sec) * 1000 + (tv.tv_usec) / 1000; // convert tv_sec & tv_usec to millisecond
+                    double ms = (tv.tv_sec) * 1000
+                        + (tv.tv_usec) / 1000; // convert tv_sec & tv_usec to millisecond
 
                     if (first_down_milliseconds == 0) {
                         // first time pressing up/down
@@ -2386,7 +2415,8 @@ void Draw()
 
                 if (scroll_dir) {
                     size_t line_idx = ImGui::GetScrollY() / lineheight;
-                    if ((line_idx > 0 && scroll_dir == -1) || (line_idx + 1 < file.lines.size() && scroll_dir == 1)) {
+                    if ((line_idx > 0 && scroll_dir == -1)
+                        || (line_idx + 1 < file.lines.size() && scroll_dir == 1)) {
                         // TODO: vsync frequency dependent, get consistent scroll
                         ImGui::SetScrollY((line_idx + scroll_dir) * lineheight);
                     }
@@ -2403,7 +2433,8 @@ void Draw()
     }
 
     if (gui.show_control) {
-        ImGui::SetNextWindowBgAlpha(1.0); // @Imgui: bug where GetStyleColor doesn't respect window opacity
+        ImGui::SetNextWindowBgAlpha(
+            1.0); // @Imgui: bug where GetStyleColor doesn't respect window opacity
         ImGui::SetNextWindowSize(MIN_WINSIZE, ImGuiCond_Once);
         ImGui::Begin("Control", &gui.show_control, ImGuiWindowFlags_NoScrollbar);
 
@@ -2527,21 +2558,25 @@ void Draw()
         ImVec2 logstart = ImGui::GetCursorPos();
         ImGui::SetCursorPos(ImVec2(logstart.x, ImGui::GetWindowHeight() - CONSOLE_BAR_HEIGHT));
         const ImVec2 AUTOCOMPLETE_START = ImVec2(ImGui::GetCursorScreenPos().x,
-            ImGui::GetCursorScreenPos().y - (phrases.size() + 1) * ImGui::GetTextLineHeightWithSpacing());
+            ImGui::GetCursorScreenPos().y
+                - (phrases.size() + 1) * ImGui::GetTextLineHeightWithSpacing());
 
         bool is_autocomplete_selected = false;
         if (phrases.size() > 0) {
             ImGui::SetNextWindowPos(AUTOCOMPLETE_START);
             ImGuiWindowFlags flags = ImGuiWindowFlags_Tooltip |
                 // ImGuiWindowFlags_NoInputs |
-                ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDocking;
+                ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize
+                | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_AlwaysAutoResize
+                | ImGuiWindowFlags_NoDocking;
             ImGui::Begin("##Autocomplete", NULL, flags);
             for (size_t i = 0; i < phrases.size(); i++) {
                 if (i == phrase_idx) {
                     ImVec2 pos = ImGui::GetWindowPos();
                     ImVec2 sz = ImGui::GetWindowSize();
                     bool hovered = (ImGui::IsMouseHoveringRect(pos, pos + sz));
-                    if (ImGui::Selectable(phrases[i].c_str(), !hovered) || IsKeyPressed(ImGuiKey_Enter))
+                    if (ImGui::Selectable(phrases[i].c_str(), !hovered)
+                        || IsKeyPressed(ImGuiKey_Enter))
                         is_autocomplete_selected = true;
                 } else {
                     if (ImGui::Selectable(phrases[i].c_str(), false)) {
@@ -2565,12 +2600,12 @@ void Draw()
                 input_command = phrases[phrase_idx];
 
             // emulate GDB, repeat last executed command upon hitting enter on an empty line
-            bool use_last_command = (input_command.size() == 0 && prog.input_cmd_offsets.size() > 0);
+            bool use_last_command
+                = (input_command.size() == 0 && prog.input_cmd_offsets.size() > 0);
             String send_command = (use_last_command) ? GetInputCommand(0) : input_command;
             std::erase_if(send_command, [](char c) { return c == '\r' || c == '\n' || c == ' '; });
             String tagged_send_command = StringPrintf("(gdb) %s", send_command.c_str());
-            WriteToConsoleBuffer(tagged_send_command.c_str(),
-                tagged_send_command.size());
+            WriteToConsoleBuffer(tagged_send_command.c_str(), tagged_send_command.size());
 
             query_phrase = "";
             if (phrase_idx < phrases.size()) {
@@ -2633,15 +2668,15 @@ void Draw()
                 GDB_SendBlocking(send_command.c_str());
             } else {
                 // wrap command in machine interpreter statement
-                String s = StringPrintf("-interpreter-exec console \"%s\"",
-                    send_command.c_str());
+                String s = StringPrintf("-interpreter-exec console \"%s\"", send_command.c_str());
                 GDB_SendBlocking(s.c_str());
             }
 
             if (!use_last_command) {
                 prog.input_cmd_idx = -1;
                 if (input_command != GetInputCommand(0)) {
-                    prog.input_cmd_offsets.insert(prog.input_cmd_offsets.begin(), prog.input_cmd_data.size());
+                    prog.input_cmd_offsets.insert(
+                        prog.input_cmd_offsets.begin(), prog.input_cmd_data.size());
                     prog.input_cmd_data += input_command;
                     prog.input_cmd_data += '\0';
                 }
@@ -2659,15 +2694,15 @@ void Draw()
         for (size_t end = phrases.size(); end > 0; end--) {
             size_t i = end - 1;
             if (NULL == strstr(phrases[i].c_str(), input_command.c_str())) {
-                phrases.erase(phrases.begin() + i,
-                    phrases.begin() + i + 1);
+                phrases.erase(phrases.begin() + i, phrases.begin() + i + 1);
             }
         }
 
         if (len_before_culling != phrases.size())
             phrase_idx = 0;
 
-        if (ImGui::IsItemActive() && IsKeyPressed(ImGuiKey_Tab)) // && ImGui::GetIO().WantCaptureKeyboard)
+        if (ImGui::IsItemActive()
+            && IsKeyPressed(ImGuiKey_Tab)) // && ImGui::GetIO().WantCaptureKeyboard)
         {
             if (phrases.size() == 0) {
                 String cmd = StringPrintf("-complete \"%s\"", input_command.c_str());
@@ -2736,7 +2771,8 @@ void Draw()
             ImGui::BeginChild("##GDB_Console", logsize, true, ImGuiWindowFlags_HorizontalScrollbar);
 
             // draw the log lines upwards from the bottom of the child window
-            // @@@ ImGui::SetCursorPosY( GetMax(ImGui::GetCursorPosY(), logsize.y - prog.num_log_rows * ImGui::GetTextLineHeightWithSpacing()) );
+            // @@@ ImGui::SetCursorPosY( GetMax(ImGui::GetCursorPosY(), logsize.y -
+            // prog.num_log_rows * ImGui::GetTextLineHeightWithSpacing()) );
 
             ImGui::TextUnformatted(prog.log, prog.log + prog.log_idx);
 
@@ -2752,7 +2788,8 @@ void Draw()
     }
 
     if (gui.show_locals) {
-        ImGui::SetNextWindowBgAlpha(1.0); // @Imgui: bug where GetStyleColor doesn't respect window opacity
+        ImGui::SetNextWindowBgAlpha(
+            1.0); // @Imgui: bug where GetStyleColor doesn't respect window opacity
         ImGui::SetNextWindowSize(MIN_WINSIZE, ImGuiCond_Once);
         ImGui::Begin("Locals", &gui.show_locals);
         if (ImGui::BeginTable("##LocalsTable", 2, TABLE_FLAGS)) {
@@ -2771,9 +2808,8 @@ void Draw()
                     ImGui::Text("%s", iter.name.c_str());
 
                     ImGui::TableNextColumn();
-                    ImColor color = (iter.changed)
-                        ? IM_COL32_WIN_RED
-                        : ImGui::GetStyleColorVec4(ImGuiCol_Text);
+                    ImColor color = (iter.changed) ? IM_COL32_WIN_RED
+                                                   : ImGui::GetStyleColorVec4(ImGuiCol_Text);
                     ImGui::TextColored(color, "%s", iter.value.c_str());
                 }
             }
@@ -2792,8 +2828,7 @@ void Draw()
         String thread_preview;
         if (prog.thread_idx < prog.threads.size()) {
             const Thread& t = prog.threads[prog.thread_idx];
-            thread_preview = StringPrintf("Thread ID %d Group ID %s",
-                t.id, t.group_id.c_str());
+            thread_preview = StringPrintf("Thread ID %d Group ID %s", t.id, t.group_id.c_str());
         }
 
         if (ImGui::BeginCombo("Threads##Callstack", thread_preview.c_str())) {
@@ -2813,9 +2848,8 @@ void Draw()
         for (size_t i = 0; i < prog.frames.size(); i++) {
             const Frame& iter = prog.frames[i];
 
-            String file = (iter.file_idx < prog.files.size())
-                ? prog.files[iter.file_idx].filename
-                : "???";
+            String file
+                = (iter.file_idx < prog.files.size()) ? prog.files[iter.file_idx].filename : "???";
 
             // @Windows
             // get the filename from the full path
@@ -2853,9 +2887,8 @@ void Draw()
                 ImGui::Text("%s", iter.name.c_str());
 
                 ImGui::TableNextColumn();
-                ImColor color = (iter.changed)
-                    ? IM_COL32_WIN_RED
-                    : ImGui::GetStyleColorVec4(ImGuiCol_Text);
+                ImColor color
+                    = (iter.changed) ? IM_COL32_WIN_RED : ImGui::GetStyleColorVec4(ImGuiCol_Text);
                 ImGui::TextColored(color, "%s", iter.value.c_str());
             }
 
@@ -2891,10 +2924,8 @@ void Draw()
                 static char editwatch[4096];
                 bool column_clicked = false;
                 if (i == edit_var_name_idx) {
-                    if (ImGui::InputText("##edit_watch", editwatch,
-                            sizeof(editwatch),
-                            ImGuiInputTextFlags_EnterReturnsTrue,
-                            NULL, NULL)) {
+                    if (ImGui::InputText("##edit_watch", editwatch, sizeof(editwatch),
+                            ImGuiInputTextFlags_EnterReturnsTrue, NULL, NULL)) {
                         iter = {};
                         iter.name = editwatch;
                         QueryWatchlist();
@@ -2910,10 +2941,11 @@ void Draw()
                     } else {
                         bool deleted = false;
                         delay++;
-                        bool active = ImGui::IsItemFocused() && (delay < 2 || ImGui::GetIO().WantCaptureKeyboard);
+                        bool active = ImGui::IsItemFocused()
+                            && (delay < 2 || ImGui::GetIO().WantCaptureKeyboard);
                         if (IsKeyPressed(ImGuiKey_Delete)) {
-                            prog.watch_vars.erase(prog.watch_vars.begin() + i,
-                                prog.watch_vars.begin() + i + 1);
+                            prog.watch_vars.erase(
+                                prog.watch_vars.begin() + i, prog.watch_vars.begin() + i + 1);
                             size_t sz = prog.watch_vars.size();
                             if (sz > 0) {
                                 // activate another watch variable input box
@@ -2935,8 +2967,10 @@ void Draw()
                     // check if table cell is clicked
                     ImVec2 p0 = ImGui::GetCursorScreenPos();
                     ImGui::Text("%s", iter.name.c_str());
-                    ImVec2 sz = ImVec2(ImGui::GetColumnWidth(), ImGui::GetCursorScreenPos().y - p0.y);
-                    if (ImGui::IsMouseHoveringRect(p0, p0 + sz) && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+                    ImVec2 sz
+                        = ImVec2(ImGui::GetColumnWidth(), ImGui::GetCursorScreenPos().y - p0.y);
+                    if (ImGui::IsMouseHoveringRect(p0, p0 + sz)
+                        && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
                         column_clicked = true;
                     }
                 }
@@ -2948,9 +2982,8 @@ void Draw()
                 }
 
                 ImGui::TableNextColumn();
-                ImColor color = (iter.changed)
-                    ? IM_COL32_WIN_RED
-                    : ImGui::GetStyleColorVec4(ImGuiCol_Text);
+                ImColor color
+                    = (iter.changed) ? IM_COL32_WIN_RED : ImGui::GetStyleColorVec4(ImGuiCol_Text);
                 ImGui::TextColored(color, "%s", iter.value.c_str());
 
                 if (iter.expr.atoms.size() > 0) {
@@ -2963,10 +2996,8 @@ void Draw()
             static char watch[256];
 
             ImGui::SetNextItemWidth(-FLT_MIN);
-            if (ImGui::InputText("##create_new_watch", watch,
-                    sizeof(watch),
-                    ImGuiInputTextFlags_EnterReturnsTrue,
-                    NULL, NULL)) {
+            if (ImGui::InputText("##create_new_watch", watch, sizeof(watch),
+                    ImGuiInputTextFlags_EnterReturnsTrue, NULL, NULL)) {
                 VarObj add = CreateVarObj(watch);
                 prog.watch_vars.push_back(add);
                 QueryWatchlist();
@@ -3008,14 +3039,16 @@ void Draw()
             HelpText("Delete all of the breakpoints and watchpoints");
 
             ImGui::SameLine();
-            if (ImGui::Checkbox("##BreakpointEnableAll", &tmp) && GDB_SendBlocking("-break-enable --all"))
+            if (ImGui::Checkbox("##BreakpointEnableAll", &tmp)
+                && GDB_SendBlocking("-break-enable --all"))
                 for (Breakpoint& b : prog.breakpoints)
                     b.enabled = true;
             HelpText("Enable all of the breakpoints");
 
             tmp = false;
             ImGui::SameLine();
-            if (ImGui::Checkbox("##BreakpointDisableAll", &tmp) && GDB_SendBlocking("-break-disable --all"))
+            if (ImGui::Checkbox("##BreakpointDisableAll", &tmp)
+                && GDB_SendBlocking("-break-disable --all"))
                 for (Breakpoint& b : prog.breakpoints)
                     b.enabled = false;
             HelpText("Disable all of the breakpoints");
@@ -3046,8 +3079,8 @@ void Draw()
                 if (ImGui::Button(tmpbuf)) {
                     tsnprintf(tmpbuf, "-break-delete %zu", iter.number);
                     if (GDB_SendBlocking(tmpbuf)) {
-                        prog.breakpoints.erase(prog.breakpoints.begin() + i,
-                            prog.breakpoints.begin() + i + 1);
+                        prog.breakpoints.erase(
+                            prog.breakpoints.begin() + i, prog.breakpoints.begin() + i + 1);
                         continue;
                     }
                 }
@@ -3074,10 +3107,8 @@ void Draw()
                 ImGui::TableSetColumnIndex(2);
                 static char editcond[1024];
                 if (i == edit_bkpt_idx) {
-                    if (ImGui::InputText("##EditBreakpointCond",
-                            editcond, sizeof(editcond),
-                            ImGuiInputTextFlags_EnterReturnsTrue,
-                            NULL, NULL)) {
+                    if (ImGui::InputText("##EditBreakpointCond", editcond, sizeof(editcond),
+                            ImGuiInputTextFlags_EnterReturnsTrue, NULL, NULL)) {
                         gdb.echo_next_no_symbol_in_context = true;
                         tsnprintf(tmpbuf, "-break-condition %d %s", (int)iter.number, editcond);
                         if (GDB_SendBlocking(tmpbuf, rec)) {
@@ -3103,9 +3134,11 @@ void Draw()
                     // check if table cell is clicked
                     ImVec2 p0 = ImGui::GetCursorScreenPos();
                     ImGuiDisabled(!has_line, ImGui::Text("%s", iter.cond.c_str()));
-                    ImVec2 sz = ImVec2(ImGui::GetColumnWidth(), ImGui::GetCursorScreenPos().y - p0.y);
+                    ImVec2 sz
+                        = ImVec2(ImGui::GetColumnWidth(), ImGui::GetCursorScreenPos().y - p0.y);
 
-                    if (has_line && ImGui::IsMouseHoveringRect(p0, p0 + sz) && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+                    if (has_line && ImGui::IsMouseHoveringRect(p0, p0 + sz)
+                        && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
                         tsnprintf(editcond, "%s", iter.cond.c_str());
                         edit_bkpt_idx = i;
                         focus_cond_input = true;
@@ -3117,7 +3150,9 @@ void Draw()
                     ImGui::Text("%u", (int)(iter.line_idx + 1));
 
                 ImGui::TableSetColumnIndex(4);
-                ImGui::Text("%s", (iter.file_idx < prog.files.size()) ? prog.files[iter.file_idx].filename.c_str() : "???");
+                ImGui::Text("%s",
+                    (iter.file_idx < prog.files.size()) ? prog.files[iter.file_idx].filename.c_str()
+                                                        : "???");
             }
 
             ImGui::PopStyleColor();
@@ -3204,8 +3239,7 @@ void Draw()
                 }
 
                 ImGui::TableSetColumnIndex(3);
-                ImGui::Text("Thread ID %d Group ID %s",
-                    thread.id, thread.group_id.c_str());
+                ImGui::Text("Thread ID %d Group ID %s", thread.id, thread.group_id.c_str());
             }
 
             // @ImGui:: when double clicking a column separator to resize to fit,
@@ -3243,46 +3277,48 @@ void Draw()
         typedef std::function<void(FileEntry & root, String & path)> RecurseFilesFn;
         static RecurseFilesFn RecurseFiles;
         int id = 0;
-        const RecurseFilesFn _RecurseFiles = [&id, &tmpbuf, &abspath](FileEntry& parent, String& path) {
-            for (FileEntry& ent : parent.entries) {
-                if (ent.dirent_d_type & DT_DIR) {
-                    if (ImGui::TreeNode(ent.filename.c_str())) {
-                        if (!ent.queried) {
-                            query_output = &ent;
-                            query_dir = path + "/" + ent.filename;
-                        } else if (ent.entries.size() > 0) {
-                            String next = path + "/" + ent.filename;
-                            RecurseFiles(ent, next);
-                        }
+        const RecurseFilesFn _RecurseFiles
+            = [&id, &tmpbuf, &abspath](FileEntry& parent, String& path) {
+                  for (FileEntry& ent : parent.entries) {
+                      if (ent.dirent_d_type & DT_DIR) {
+                          if (ImGui::TreeNode(ent.filename.c_str())) {
+                              if (!ent.queried) {
+                                  query_output = &ent;
+                                  query_dir = path + "/" + ent.filename;
+                              } else if (ent.entries.size() > 0) {
+                                  String next = path + "/" + ent.filename;
+                                  RecurseFiles(ent, next);
+                              }
 
-                        ImGui::TreePop();
-                    }
-                } else {
-                    tsnprintf(tmpbuf, "%s##%d", ent.filename.c_str(), id++);
-                    if (ImGui::Selectable(tmpbuf)) {
-                        String relpath = path + "/" + ent.filename;
-                        char* rc = realpath(relpath.c_str(), abspath);
-                        if (rc == NULL) {
-                            PrintErrorf("realpath %s\n", GetErrorString(errno));
-                        } else {
-                            size_t idx = FindOrCreateFile(abspath);
-                            File& f = prog.files[idx];
-                            if (f.lines.size() > 0 || LoadFile(f)) {
-                                prog.file_idx = idx;
-                                gui.jump_type = Jump_Goto;
-                                gui.goto_line_idx = 0;
-                            }
-                        }
-                    }
-                }
-            }
-        };
+                              ImGui::TreePop();
+                          }
+                      } else {
+                          tsnprintf(tmpbuf, "%s##%d", ent.filename.c_str(), id++);
+                          if (ImGui::Selectable(tmpbuf)) {
+                              String relpath = path + "/" + ent.filename;
+                              char* rc = realpath(relpath.c_str(), abspath);
+                              if (rc == NULL) {
+                                  PrintErrorf("realpath %s\n", GetErrorString(errno));
+                              } else {
+                                  size_t idx = FindOrCreateFile(abspath);
+                                  File& f = prog.files[idx];
+                                  if (f.lines.size() > 0 || LoadFile(f)) {
+                                      prog.file_idx = idx;
+                                      gui.jump_type = Jump_Goto;
+                                      gui.goto_line_idx = 0;
+                                  }
+                              }
+                          }
+                      }
+                  }
+              };
 
         static FileWindowContext ctx;
         static bool show_change_dir = false;
         show_change_dir |= ImGui::Button("...##ChangeDirectory");
 
-        if (show_change_dir && ImGuiFileWindow(ctx, ImGuiFileWindowMode_SelectDirectory, root.filename.c_str())) {
+        if (show_change_dir
+            && ImGuiFileWindow(ctx, ImGuiFileWindowMode_SelectDirectory, root.filename.c_str())) {
             if (ctx.selected) {
                 query_output = &root;
                 root.filename = ctx.path.c_str();
@@ -3347,8 +3383,7 @@ void Draw()
     if (gui.show_tutorial) {
         static int window_idx = 0;
         ImGui::SetNextWindowSize(MIN_WINSIZE, ImGuiCond_Once);
-        ImGui::Begin("Tutorial", &gui.show_tutorial,
-            ImGuiWindowFlags_AlwaysAutoResize);
+        ImGui::Begin("Tutorial", &gui.show_tutorial, ImGuiWindowFlags_AlwaysAutoResize);
 
         const char* window_names[] = {
             "Source",
@@ -3379,7 +3414,9 @@ void Draw()
         case 0:
             gui.show_source = true;
             ImGui::Text("View source code file of the program being run");
-            ImGui::Text("Open file by clicking menu button \"File > Open...\" or clicking a filename in the \"Directory Viewer\" window");
+            ImGui::Text("Open file by clicking menu button \"File > Open...\" or clicking a "
+                        "filename in the "
+                        "\"Directory Viewer\" window");
             ImGui::Text("Ctrl-G: Open \"Goto Line\" window:");
             Tab(1);
             ImGui::BulletText("Input a line number and press enter to jump to it");
@@ -3415,7 +3452,8 @@ void Draw()
         case 4:
             gui.show_registers = true;
             ImGui::Text("View values of CPU registers.");
-            ImGui::Text("Configure shown registers by hitting menu button \"Settings\" then \"Configure Registers\"");
+            ImGui::Text("Configure shown registers by hitting menu button \"Settings\" then "
+                        "\"Configure Registers\"");
             break;
         case 5:
             gui.show_watch = true;
@@ -3433,7 +3471,8 @@ void Draw()
             gui.show_threads = true;
             gui.tutorial_id = ImHashStr("##ThreadsTable", 0, ImHashStr("Threads"));
             ImGui::Text("View threads of a program");
-            ImGui::Text("Far left column contains the focused threads: ones selected to step, continue, next");
+            ImGui::Text("Far left column contains the focused threads: ones selected to step, "
+                        "continue, next");
             Tab(1);
             ImGui::BulletText("Shift-LeftClick a checkbox to make it the only one focused");
             break;
@@ -3490,8 +3529,7 @@ void DrawDebugOverlay()
         drawlist->AddText(TL, 0xFF000000, tmp);
 
         snprintf(tmp, sizeof(tmp), "Application average %.3f ms/frame (%.1f FPS)",
-            1000.0f / ImGui::GetIO().Framerate,
-            ImGui::GetIO().Framerate);
+            1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 
         TL.y = BR.y;
         BR = ImGui::CalcTextSize(tmp);
@@ -3513,9 +3551,11 @@ void DrawDebugOverlay()
 
                 // windows are stored back to front
                 for (ImGuiWindow* iter : ctx->Windows) {
-                    const ImVec2 WINDOW_BR = ImVec2(iter->Pos.x + iter->Size.x,
-                        iter->Pos.y + iter->Size.y);
-                    if ((!iter->Hidden && !iter->Collapsed) && (iter->Pos.x <= mousepos.x && iter->Pos.y <= mousepos.y) && (WINDOW_BR.x >= mousepos.x && WINDOW_BR.y >= mousepos.y)) {
+                    const ImVec2 WINDOW_BR
+                        = ImVec2(iter->Pos.x + iter->Size.x, iter->Pos.y + iter->Size.y);
+                    if ((!iter->Hidden && !iter->Collapsed)
+                        && (iter->Pos.x <= mousepos.x && iter->Pos.y <= mousepos.y)
+                        && (WINDOW_BR.x >= mousepos.x && WINDOW_BR.y >= mousepos.y)) {
                         pinned_window = iter->Pos;
                     }
                 }
@@ -3525,17 +3565,17 @@ void DrawDebugOverlay()
 
         if (pinned_point_toggled) {
             // draw a rect in the selected window
-            const ImVec2 PIN_BR = ImVec2(mousepos.x - pinned_window.x,
-                mousepos.y - pinned_window.y);
-            const ImVec2 PIN_TL = ImVec2(pinned_point.x - pinned_window.x,
-                pinned_point.y - pinned_window.y);
+            const ImVec2 PIN_BR
+                = ImVec2(mousepos.x - pinned_window.x, mousepos.y - pinned_window.y);
+            const ImVec2 PIN_TL
+                = ImVec2(pinned_point.x - pinned_window.x, pinned_point.y - pinned_window.y);
 
             uint32_t col = IM_COL32(0, 255, 0, 32);
             drawlist->AddRectFilled(pinned_point, mousepos, col);
 
             snprintf(tmp, sizeof(tmp), "window rect:\n  pos: (%d, %d)\n  size: (%d, %d)",
-                (int)PIN_TL.x, (int)PIN_TL.y,
-                (int)(PIN_BR.x - PIN_TL.x), (int)(PIN_BR.y - PIN_TL.y));
+                (int)PIN_TL.x, (int)PIN_TL.y, (int)(PIN_BR.x - PIN_TL.x),
+                (int)(PIN_BR.y - PIN_TL.y));
             BR = ImGui::CalcTextSize(tmp);
             TL = ImVec2(pinned_point.x, pinned_point.y - BR.y);
             BR.x += TL.x;
@@ -3648,8 +3688,9 @@ void load_config(const std::string& ini_data)
     }
 
     String theme = LoadString("WindowTheme", "DarkBlue");
-    gui.window_theme = (theme == "Light") ? WindowTheme_Light : (theme == "DarkPurple") ? WindowTheme_DarkPurple
-                                                                                        : WindowTheme_DarkBlue;
+    gui.window_theme = (theme == "Light") ? WindowTheme_Light
+        : (theme == "DarkPurple")         ? WindowTheme_DarkPurple
+                                          : WindowTheme_DarkBlue;
     gui.hover_delay_ms = (int)LoadFloat("HoverDelay", 100);
 
     // load debug session history
@@ -3665,7 +3706,7 @@ void load_config(const std::string& ini_data)
 
         if (s.debug_exe.size() <= 0)
             break;
-        
+
         gui.session_history.push_back(s);
     }
 }
@@ -3697,8 +3738,9 @@ void save_config()
     file << std::format("FontFilename={}\n", gui.font_filename.c_str());
     file << std::format("FontSize={}\n", gui.font_size);
 
-    String theme = (gui.window_theme == WindowTheme_Light) ? "Light" : (gui.window_theme == WindowTheme_DarkPurple) ? "DarkPurple"
-                                                                                                                    : "DarkBlue";
+    String theme = (gui.window_theme == WindowTheme_Light) ? "Light"
+        : (gui.window_theme == WindowTheme_DarkPurple)     ? "DarkPurple"
+                                                           : "DarkBlue";
     file << std::format("WindowTheme={}\n", theme.c_str());
 
     file << std::format("HoverDelay={}\n", gui.hover_delay_ms);
@@ -3927,7 +3969,7 @@ int main(int argc, char** argv)
             gdb.debug_filename = "";
         }
     }
-    
+
     load_config(ini_data);
 
     // load config
@@ -3947,8 +3989,7 @@ int main(int argc, char** argv)
             ExitMessage("glfwInit\n");
 
         glfwWindowHint(GLFW_MAXIMIZED, window_maximized);
-        gui.window = glfwCreateWindow(window_width, window_height,
-            "Tug", NULL, NULL);
+        gui.window = glfwCreateWindow(window_width, window_height, "Tug", NULL, NULL);
         if (gui.window == NULL)
             ExitMessage("glfwCreateWindow\n");
 
@@ -4004,12 +4045,16 @@ int main(int argc, char** argv)
     // Main loop
     while (!glfwWindowShouldClose(gui.window)) {
         // Poll and handle events (inputs, window resize, etc.)
-        // You can read the io.WantCaptureMouse, io.WantCaptureKeyboard flags to tell if dear imgui wants to use your inputs.
-        // - When io.WantCaptureMouse is true, do not dispatch mouse input data to your main application.
-        // - When io.WantCaptureKeyboard is true, do not dispatch keyboard input data to your main application.
-        // Generally you may always pass all inputs to dear imgui, and hide them from your application based on those two flags.
+        // You can read the io.WantCaptureMouse, io.WantCaptureKeyboard flags to tell if dear imgui
+        // wants to use your inputs.
+        // - When io.WantCaptureMouse is true, do not dispatch mouse input data to your main
+        // application.
+        // - When io.WantCaptureKeyboard is true, do not dispatch keyboard input data to your main
+        // application. Generally you may always pass all inputs to dear imgui, and hide them from
+        // your application based on those two flags.
 
-        if (!glfwGetWindowAttrib(gui.window, GLFW_VISIBLE) || glfwGetWindowAttrib(gui.window, GLFW_ICONIFIED)) {
+        if (!glfwGetWindowAttrib(gui.window, GLFW_VISIBLE)
+            || glfwGetWindowAttrib(gui.window, GLFW_ICONIFIED)) {
             glfwWaitEvents();
         }
 
@@ -4017,7 +4062,8 @@ int main(int argc, char** argv)
 
         if (gui.change_font) {
             // change font data before it gets locked with NewFrame
-            // TODO: reloading both fonts when source font changes, might change to font scaling instead
+            // TODO: reloading both fonts when source font changes, might change to font scaling
+            // instead
             gui.change_font = false;
             io.Fonts->Clear();
             ImGui_ImplOpenGL2_DestroyFontsTexture();
@@ -4030,14 +4076,16 @@ int main(int argc, char** argv)
                         // fallback to default
                         use_default_font = true;
                         font_size = DEFAULT_FONT_SIZE;
-                        PrintErrorf("error loading font %s, reverting to default...\n", gui.font_filename.c_str());
+                        PrintErrorf("error loading font %s, reverting to default...\n",
+                            gui.font_filename.c_str());
                     }
                 }
 
                 if (use_default_font) {
                     ImFontConfig cfg = {};
                     cfg.FontDataOwnedByAtlas = false; // static memory
-                    result = io.Fonts->AddFontFromMemoryTTF(liberation_mono_ttf, sizeof(liberation_mono_ttf), font_size, &cfg);
+                    result = io.Fonts->AddFontFromMemoryTTF(
+                        liberation_mono_ttf, sizeof(liberation_mono_ttf), font_size, &cfg);
                     if (result == NULL)
                         PrintError("error loading default font?!?!?");
                 }
@@ -4072,7 +4120,8 @@ int main(int argc, char** argv)
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        ImGui::DockSpaceOverViewport(ImGui::GetMainViewport(), ImGuiDockNodeFlags_PassthruCentralNode);
+        ImGui::DockSpaceOverViewport(
+            ImGui::GetMainViewport(), ImGuiDockNodeFlags_PassthruCentralNode);
         DrawDebugOverlay();
         Draw();
 
@@ -4083,14 +4132,14 @@ int main(int argc, char** argv)
         ImGui::Render();
         glfwGetFramebufferSize(gui.window, &display_w, &display_h);
         glViewport(0, 0, display_w, display_h);
-        glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w);
+        glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w,
+            clear_color.z * clear_color.w, clear_color.w);
         glClear(GL_COLOR_BUFFER_BIT);
 
-        // If you are using this code with non-legacy OpenGL header/contexts (which you should not, prefer using imgui_impl_opengl3.cpp!!),
-        // you may need to backup/reset/restore other state, e.g. for current shader using the commented lines below.
-        // GLint last_program;
-        // glGetIntegerv(GL_CURRENT_PROGRAM, &last_program);
-        // glUseProgram(0);
+        // If you are using this code with non-legacy OpenGL header/contexts (which you should not,
+        // prefer using imgui_impl_opengl3.cpp!!), you may need to backup/reset/restore other state,
+        // e.g. for current shader using the commented lines below. GLint last_program;
+        // glGetIntegerv(GL_CURRENT_PROGRAM, &last_program); glUseProgram(0);
         ImGui_ImplOpenGL2_RenderDrawData(ImGui::GetDrawData());
         // glUseProgram(last_program);
 
