@@ -20,6 +20,7 @@
 
 #include <fstream>
 #include <functional>
+#include <filesystem>
 
 // third party
 #include <imgui/imconfig.h>
@@ -29,6 +30,7 @@
 #include <imgui/imgui_impl_opengl2.h>
 #include <GLFW/glfw3.h>
 #include <imgui_file_window.h>
+#include <unistd.h>
 #include "liberation_mono.h"
 
 // imgui/misc/imgui_stdlib.cpp
@@ -3545,6 +3547,180 @@ void DrawDebugOverlay()
     }
 }
 
+std::filesystem::path get_config_path()
+{
+    std::string config_path;
+    const char* xdg_config_env = getenv("XDG_CONFIG_HOME");
+    if (xdg_config_env != NULL) {
+        config_path = xdg_config_env;
+    } else {
+        const char* home = getenv("HOME");
+        config_path = std::format("{}/.config", home);
+    }
+
+    return std::format("{}/tug.ini", config_path);
+}
+
+std::string read_config()
+{
+    std::filesystem::path config_path(get_config_path());
+    if (!std::filesystem::exists(config_path) || !std::filesystem::is_regular_file(config_path))
+        return default_ini;
+
+    std::ifstream file(config_path, std::ios::binary | std::ios::ate);
+    if (!file)
+        return default_ini;
+
+    std::streamsize size = file.tellg();
+    file.seekg(0, std::ios::beg);
+
+    std::string buffer(static_cast<std::size_t>(size), '\0');
+    if (!file.read(buffer.data(), size))
+        return default_ini;
+
+    return buffer;
+}
+
+void load_config(const std::string& ini_data)
+{
+    size_t ini_data_end_idx = ini_data.find("; ImGui Begin");
+    if (ini_data_end_idx == SIZE_MAX)
+        ini_data_end_idx = ini_data.size();
+
+    const auto LoadString = [&](String key, String default_value) -> String {
+        String result;
+        key += "=";
+        size_t index = ini_data.find(key);
+        if (index < ini_data_end_idx) {
+            size_t start_index = index + key.size();
+            size_t end_index = start_index;
+            while (end_index < ini_data_end_idx) {
+                char c = ini_data[end_index];
+                if (c == '\n' || c == '\r') {
+                    break;
+                } else {
+                    end_index++;
+                }
+            }
+
+            result = ini_data.substr(start_index, end_index - start_index);
+        } else {
+            result = default_value;
+        }
+
+        return result;
+    };
+
+    const auto LoadFloat = [&](String key, float default_value) -> float {
+        float result = default_value;
+        String str_value = LoadString(key, "");
+        float x = strtof(str_value.c_str(), NULL);
+        if (x != 0.0f || (str_value.size() != 0 && str_value[0] == '0')) {
+            result = x;
+        }
+        return result;
+    };
+
+    const auto LoadBool = [&](String key, bool default_value) -> bool {
+        return ("0" != LoadString(key, default_value ? "1" : "0"));
+    };
+
+    gui.show_callstack = LoadBool("Callstack", true);
+    gui.show_locals = LoadBool("Locals", true);
+    gui.show_watch = LoadBool("Watch", true);
+    gui.show_control = LoadBool("Control", true);
+    gui.show_breakpoints = LoadBool("Breakpoints", true);
+    gui.show_source = LoadBool("Source", true);
+    gui.show_registers = LoadBool("Registers", false);
+    gui.show_threads = LoadBool("Threads", false);
+    gui.show_directory_viewer = LoadBool("DirectoryViewer", true);
+
+    float font_size = LoadFloat("FontSize", DEFAULT_FONT_SIZE);
+    if (font_size != 0.0f) {
+        gui.font_size = font_size;
+        gui.source_font_size = font_size;
+    }
+
+    gui.font_filename = LoadString("FontFilename", "");
+    if (gui.font_filename != "") {
+        gui.change_font = true;
+        gui.use_default_font = false;
+    }
+
+    String theme = LoadString("WindowTheme", "DarkBlue");
+    gui.window_theme = (theme == "Light") ? WindowTheme_Light : (theme == "DarkPurple") ? WindowTheme_DarkPurple
+                                                                                        : WindowTheme_DarkBlue;
+    gui.hover_delay_ms = (int)LoadFloat("HoverDelay", 100);
+
+    // load debug session history
+    int session_idx = 0;
+    while (true) {
+        String exef = StringPrintf("DebugFilename%d", session_idx);
+        String argf = StringPrintf("DebugArgs%d", session_idx);
+        session_idx += 1;
+
+        Session s = {};
+        s.debug_exe = LoadString(exef, "");
+        s.debug_args = LoadString(argf, "");
+
+        if (s.debug_exe.size() <= 0)
+            break;
+        
+        gui.session_history.push_back(s);
+    }
+}
+
+void save_config()
+{
+    std::filesystem::path config_path(get_config_path());
+    std::filesystem::path config_dirname(config_path.parent_path());
+    if (!std::filesystem::exists(config_dirname))
+        std::filesystem::create_directories(config_dirname);
+
+    std::ofstream file(config_path, std::ios::binary | std::ios::app);
+    if (!file)
+        return;
+
+    // write custom tug ini information
+    file << "[Tug]\n";
+
+    // save docking tab visibility, imgui doesn't save this at the moment
+    file << std::format("Callstack={}\n", gui.show_callstack);
+    file << std::format("Locals={}\n", gui.show_locals);
+    file << std::format("Registers={}\n", gui.show_registers);
+    file << std::format("Watch={}\n", gui.show_watch);
+    file << std::format("Control={}\n", gui.show_control);
+    file << std::format("Source={}\n", gui.show_source);
+    file << std::format("Breakpoints={}\n", gui.show_breakpoints);
+    file << std::format("Threads={}\n", gui.show_threads);
+    file << std::format("DirectoryViewer={}\n", gui.show_directory_viewer);
+    file << std::format("FontFilename={}\n", gui.font_filename.c_str());
+    file << std::format("FontSize={}\n", gui.font_size);
+
+    String theme = (gui.window_theme == WindowTheme_Light) ? "Light" : (gui.window_theme == WindowTheme_DarkPurple) ? "DarkPurple"
+                                                                                                                    : "DarkBlue";
+    file << std::format("WindowTheme={}\n", theme.c_str());
+
+    file << std::format("HoverDelay={}\n", gui.hover_delay_ms);
+    file << std::format("CursorBlink={}\n", ImGui::GetIO().ConfigInputTextCursorBlink);
+
+    for (size_t i = 0; i < gui.session_history.size(); i++) {
+        Session& iter = gui.session_history[i];
+        file << std::format("DebugFilename{}={}\n", i, iter.debug_exe.c_str());
+        if (iter.debug_args.size()) {
+            file << std::format("DebugArgs{}={}\n", i, iter.debug_args.c_str());
+        }
+    }
+
+    // write the imgui side of the ini file
+    size_t imgui_ini_size = 0;
+    const char* imgui_ini_data = ImGui::SaveIniSettingsToMemory(&imgui_ini_size);
+    if (imgui_ini_data && imgui_ini_size) {
+        file << "\n; ImGui Begin\n";
+        file.write(imgui_ini_data, imgui_ini_size);
+    }
+}
+
 int main(int argc, char** argv)
 {
 #define ExitMessagef(fmt, ...)           \
@@ -3554,57 +3730,7 @@ int main(int argc, char** argv)
     } while (0)
 #define ExitMessage(msg) ExitMessagef("%s", msg)
 
-    String ini_data;
-    String ini_filename;
-    {
-        // show the tutorial if the tug executable is new enough
-        // and the config file is not found
-        time_t sec = time(NULL);
-        struct stat st = {};
-        char tug_abspath[PATH_MAX] = {};
-
-        // get config directory
-        String xdg_path;
-        const char* xdg_config_env = getenv("XDG_CONFIG_HOME");
-        if (xdg_config_env) {
-            xdg_path = xdg_config_env;
-        } else {
-            const char* home = getenv("HOME");
-            if (home) {
-                xdg_path = StringPrintf("%s/.config", home);
-            }
-        }
-
-        // get ini filename
-        struct stat xdg_stat = {};
-        if (0 == stat(xdg_path.c_str(), &xdg_stat) && S_ISDIR(xdg_stat.st_mode)) {
-            xdg_path += "/tug";
-            if (0 == mkdir(xdg_path.c_str(), 0777) || errno == EEXIST) {
-                ini_filename = xdg_path + "/tug.ini";
-            }
-        } else {
-            ini_filename = "tug.ini";
-        }
-
-        if (0 < readlink("/proc/self/exe", tug_abspath, sizeof(tug_abspath))) {
-            if (0 == stat(tug_abspath, &st) && difftime(sec, st.st_mtime) <= 2 * 60 && !DoesFileExist(ini_filename.c_str(), false)) {
-                gui.show_tutorial = true;
-            }
-        }
-
-        // load the tug configuration with imgui data below it
-        if (0 == stat(ini_filename.c_str(), &st) && S_ISREG(st.st_mode)) {
-            FILE* f = fopen(ini_filename.c_str(), "rb");
-            if (f != NULL) {
-                ini_data.resize(st.st_size);
-                if (fread(&ini_data[0], 1, st.st_size, f)) {
-                    // silence unused result warning
-                }
-                fclose(f);
-                f = NULL;
-            }
-        }
-    }
+    String ini_data = read_config();
 
     static const auto Shutdown = []() {
         // shutdown imgui
@@ -3801,124 +3927,17 @@ int main(int argc, char** argv)
             gdb.debug_filename = "";
         }
     }
+    
+    load_config(ini_data);
 
     // load config
-    int window_width = 0;
-    int window_height = 0;
+    int window_width = 1080;
+    int window_height = 720;
     int window_x = 0;
     int window_y = 0;
     bool window_maximized = false;
     bool window_has_x_or_y = false;
     bool cursor_blink = false;
-    {
-        if (ini_data.size() == 0) {
-            // workaround for generating a dockspace through loading an ini file
-            // originally used ImGui DockBuilder api to make the docking space but
-            // there was a bug where some nodes would not resize proportionally
-            // to the framebuffer
-            ini_data = default_ini;
-        }
-
-        size_t ini_data_end_idx = ini_data.find("; ImGui Begin");
-        if (ini_data_end_idx == SIZE_MAX)
-            ini_data_end_idx = ini_data.size();
-
-        const auto HasKey = [&](String key) -> bool {
-            return (SIZE_MAX != ini_data.find(key + "="));
-        };
-        const auto LoadString = [&](String key, String default_value) -> String {
-            String result;
-            key += "=";
-            size_t index = ini_data.find(key);
-            if (index < ini_data_end_idx) {
-                size_t start_index = index + key.size();
-                size_t end_index = start_index;
-                while (end_index < ini_data_end_idx) {
-                    char c = ini_data[end_index];
-                    if (c == '\n' || c == '\r') {
-                        break;
-                    } else {
-                        end_index++;
-                    }
-                }
-
-                result = ini_data.substr(start_index, end_index - start_index);
-            } else {
-                result = default_value;
-            }
-
-            return result;
-        };
-
-        const auto LoadFloat = [&](String key, float default_value) -> float {
-            float result = default_value;
-            String str_value = LoadString(key, "");
-            float x = strtof(str_value.c_str(), NULL);
-            if (x != 0.0f || (str_value.size() != 0 && str_value[0] == '0')) {
-                result = x;
-            }
-            return result;
-        };
-
-        const auto LoadBool = [&](String key, bool default_value) -> bool {
-            return ("0" != LoadString(key, default_value ? "1" : "0"));
-        };
-
-        gui.show_callstack = LoadBool("Callstack", true);
-        gui.show_locals = LoadBool("Locals", true);
-        gui.show_watch = LoadBool("Watch", true);
-        gui.show_control = LoadBool("Control", true);
-        gui.show_breakpoints = LoadBool("Breakpoints", true);
-        gui.show_source = LoadBool("Source", true);
-        gui.show_registers = LoadBool("Registers", false);
-        gui.show_threads = LoadBool("Threads", false);
-        gui.show_directory_viewer = LoadBool("DirectoryViewer", true);
-
-        float font_size = LoadFloat("FontSize", DEFAULT_FONT_SIZE);
-        if (font_size != 0.0f) {
-            gui.font_size = font_size;
-            gui.source_font_size = font_size;
-        }
-
-        gui.font_filename = LoadString("FontFilename", "");
-        if (gui.font_filename != "") {
-            gui.change_font = true;
-            gui.use_default_font = false;
-        }
-
-        String theme = LoadString("WindowTheme", "DarkBlue");
-        gui.window_theme = (theme == "Light") ? WindowTheme_Light : (theme == "DarkPurple") ? WindowTheme_DarkPurple
-                                                                                            : WindowTheme_DarkBlue;
-
-        window_width = (int)LoadFloat("WindowWidth", 1280);
-        window_height = (int)LoadFloat("WindowHeight", 720);
-        if (HasKey("WindowX") || HasKey("WindowY")) {
-            window_has_x_or_y = true;
-            window_x = (int)LoadFloat("WindowX", 0);
-            window_y = (int)LoadFloat("WindowY", 0);
-        }
-        window_maximized = LoadBool("WindowMaximized", false);
-        gui.hover_delay_ms = (int)LoadFloat("HoverDelay", 100);
-        cursor_blink = LoadBool("CursorBlink", true);
-
-        // load debug session history
-        int session_idx = 0;
-        for (;;) {
-            String exef = StringPrintf("DebugFilename%d", session_idx);
-            String argf = StringPrintf("DebugArgs%d", session_idx);
-            session_idx += 1;
-
-            Session s = {};
-            s.debug_exe = LoadString(exef, "");
-            s.debug_args = LoadString(argf, "");
-
-            if (s.debug_exe.size()) {
-                gui.session_history.push_back(s);
-            } else {
-                break;
-            }
-        }
-    }
 
     // initialize GLFW
     {
@@ -4085,55 +4104,7 @@ int main(int argc, char** argv)
         glfwGetWindowSize(gui.window, &window_width, &window_height);
     }
 
-    // write config
-    FILE* f = fopen(ini_filename.c_str(), "wt");
-    if (f != NULL) {
-        // write custom tug ini information
-        fprintf(f, "[Tug]\n");
-
-        // save docking tab visibility, imgui doesn't save this at the moment
-        fprintf(f, "Callstack=%d\n", gui.show_callstack);
-        fprintf(f, "Locals=%d\n", gui.show_locals);
-        fprintf(f, "Registers=%d\n", gui.show_registers);
-        fprintf(f, "Watch=%d\n", gui.show_watch);
-        fprintf(f, "Control=%d\n", gui.show_control);
-        fprintf(f, "Source=%d\n", gui.show_source);
-        fprintf(f, "Breakpoints=%d\n", gui.show_breakpoints);
-        fprintf(f, "Threads=%d\n", gui.show_threads);
-        fprintf(f, "DirectoryViewer=%d\n", gui.show_directory_viewer);
-        fprintf(f, "FontFilename=%s\n", gui.font_filename.c_str());
-        fprintf(f, "FontSize=%.0f\n", gui.font_size);
-
-        String theme = (gui.window_theme == WindowTheme_Light) ? "Light" : (gui.window_theme == WindowTheme_DarkPurple) ? "DarkPurple"
-                                                                                                                        : "DarkBlue";
-        fprintf(f, "WindowTheme=%s\n", theme.c_str());
-
-        fprintf(f, "WindowWidth=%d\n", window_width);
-        fprintf(f, "WindowHeight=%d\n", window_height);
-        fprintf(f, "WindowX=%d\n", window_x);
-        fprintf(f, "WindowY=%d\n", window_y);
-        fprintf(f, "WindowMaximized=%d\n", window_maximized);
-        fprintf(f, "HoverDelay=%d\n", gui.hover_delay_ms);
-        fprintf(f, "CursorBlink=%d\n", io.ConfigInputTextCursorBlink);
-
-        for (size_t i = 0; i < gui.session_history.size(); i++) {
-            Session& iter = gui.session_history[i];
-            fprintf(f, "DebugFilename%zu=%s\n", i, iter.debug_exe.c_str());
-            if (iter.debug_args.size()) {
-                fprintf(f, "DebugArgs%zu=%s\n", i, iter.debug_args.c_str());
-            }
-        }
-
-        // write the imgui side of the ini file
-        size_t imgui_ini_size = 0;
-        const char* imgui_ini_data = ImGui::SaveIniSettingsToMemory(&imgui_ini_size);
-        if (imgui_ini_data && imgui_ini_size) {
-            fprintf(f, "\n; ImGui Begin\n");
-            fwrite(imgui_ini_data, 1, imgui_ini_size, f);
-        }
-        fclose(f);
-        f = NULL;
-    }
+    save_config();
 
     // Shutdown lambda called here from atexit
     return EXIT_SUCCESS;
