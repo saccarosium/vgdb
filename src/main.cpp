@@ -330,8 +330,6 @@ Program prog;
 GDB gdb;
 GUI gui;
 
-void dbg() { }
-
 static uint64_t ParseHex(const String& str)
 {
     uint64_t result = 0;
@@ -385,21 +383,6 @@ static void SetWindowTheme(WindowTheme theme)
 
         DefaultInvalid
     }
-
-#if 1
-    // defaults are too damn bright!
-    ImVec4 hdr = ImGui::GetStyleColorVec4(ImGuiCol_Header);
-    ImVec4 hdr_hovered = ImVec4(hdr.x, hdr.y, hdr.z, GetMin(1.0f, hdr.w + 0.2));
-    ImVec4 hdr_active = ImVec4(hdr.x, hdr.y, hdr.z, GetMin(1.0f, hdr.w + 0.4));
-    style.Colors[ImGuiCol_HeaderHovered] = hdr_hovered;
-    style.Colors[ImGuiCol_HeaderActive] = hdr_active;
-
-    ImVec4 btn = ImGui::GetStyleColorVec4(ImGuiCol_Button);
-    ImVec4 btn_hovered = ImVec4(btn.x, btn.y, btn.z, GetMin(1.0f, btn.w + 0.2));
-    ImVec4 btn_active = ImVec4(btn.x, btn.y, btn.z, GetMin(1.0f, btn.w + 0.4));
-    style.Colors[ImGuiCol_ButtonHovered] = btn_hovered;
-    style.Colors[ImGuiCol_ButtonActive] = btn_active;
-#endif
 
     gui.window_theme = theme;
 }
@@ -4040,7 +4023,9 @@ int main(int argc, char** argv)
 
     // Setup Dear ImGui style
     SetWindowTheme(gui.window_theme);
-    ImGui::GetStyle().ScrollbarSize = 20.0f;
+    ImGuiStyle& style = ImGui::GetStyle();
+    style.ScrollbarRounding = 2.0f;
+    style.TabRounding = 2.0f;
 
     // Main loop
     while (!glfwWindowShouldClose(gui.window)) {
