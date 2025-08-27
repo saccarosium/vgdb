@@ -279,30 +279,26 @@ bool GDB_StartProcess(String gdb_filename, String gdb_args)
 
 bool GDB_SetInferiorExe(String filename)
 {
-    bool result = false;
     String s = StringPrintf("-file-exec-and-symbols \"%s\"", filename.c_str());
-    if (GDB_SendBlocking(s.c_str()))
-    {
-        Printf("set debug exe %s\n", filename.c_str());
-        gdb.debug_filename = filename;
-        result = true;
-    }
+    if (!GDB_SendBlocking(s.c_str()))
+        return false;
 
-    return result;
+    Printf("set debug exe %s\n", filename.c_str());
+    gdb.debug_filename = filename;
+
+    return true;
 }
 
 bool GDB_SetInferiorArgs(String args)
 {
-    bool result = false;
     String s = StringPrintf("-exec-arguments %s", args.c_str());
-    if (GDB_SendBlocking(s.c_str()))
-    {
-        Printf("set args %s\n", args.c_str());
-        gdb.debug_args = args;
-        result = true;
-    }
+    if (!GDB_SendBlocking(s.c_str()))
+        return false;
 
-    return result;
+    Printf("set args %s\n", args.c_str());
+    gdb.debug_args = args;
+
+    return true;
 }
 
 bool GDB_LoadInferior(String filename, String args)

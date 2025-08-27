@@ -378,72 +378,66 @@ static void SetWindowTheme(WindowTheme theme)
 
 bool LoadFile(File& file)
 {
-    bool result = false;
     struct stat sb = {};
-    if (file.lines.size() == 0 && 0 == stat(file.filename.c_str(), &sb)) {
-        FILE* f = fopen(file.filename.c_str(), "rb");
-        if (f == NULL) {
-            PrintErrorf("fopen %s\n", GetErrorString(errno));
-        } else {
-            size_t filesize = sb.st_size;
-            file.data.resize(filesize);
-            if (0 < fread((void*)file.data.data(), 1, filesize, f)) {
-                // move file up so that the data will be packed
-                // lines will be accessed by offsetting into one big buf
-                char* fd = (char*)file.data.data();
-                size_t i = 0;
-                char* lst = fd;
-                size_t num_trunc = 0;
+    if (file.lines.size() != 0 || stat(file.filename.c_str(), &sb) != 0)
+        return false;
 
-                while (i < filesize) {
-                    char c0 = fd[i];
-                    char c1 = (i + 1 < filesize) ? fd[i + 1] : '\0';
-                    size_t end = (c0 == '\n')        ? 1
-                        : (c0 == '\r' && c1 == '\n') ? 2
-                        : (c0 == '\r')               ? 1
-                                                     : 0;
-
-                    if (end != 0) {
-                        char* dest = lst - num_trunc;
-                        memmove(dest, lst, (fd + i) - lst);
-
-                        file.lines.push_back(dest - fd);
-
-                        num_trunc += end;
-                        i += end;
-                        lst = fd + i;
-                    } else {
-                        i++;
-                    }
-                }
-
-                // truncate file to size minus sum of line endings
-                file.data.resize(file.data.size() - num_trunc);
-            }
-
-            // TODO: possibly not the longest line when line number is large enough
-            // format is [breakpoint] [ %-4d line number] [line]
-            file.longest_line_idx = 0;
-            size_t max_chars = 0;
-            size_t len = file.data.size();
-            for (size_t i = file.lines.size() - 1; i < file.lines.size(); i--) {
-                size_t this_line_len = len - file.lines[i];
-                if (max_chars < this_line_len) {
-                    max_chars = this_line_len;
-                    file.longest_line_idx = i;
-                }
-
-                len = file.lines[i];
-            }
-
-            fclose(f);
-            f = NULL;
-
-            result = true;
-        }
+    FILE* f = fopen(file.filename.c_str(), "rb");
+    if (f == NULL) {
+        PrintErrorf("fopen %s\n", GetErrorString(errno));
+        return false;
     }
 
-    return result;
+    size_t filesize = sb.st_size;
+    file.data.resize(filesize);
+    if (0 < fread((void*)file.data.data(), 1, filesize, f)) {
+        // move file up so that the data will be packed
+        // lines will be accessed by offsetting into one big buf
+        char* fd = (char*)file.data.data();
+        size_t i = 0;
+        char* lst = fd;
+        size_t num_trunc = 0;
+
+        while (i < filesize) {
+            char c0 = fd[i];
+            char c1 = (i + 1 < filesize) ? fd[i + 1] : '\0';
+            size_t end = (c0 == '\n') ? 1 : (c0 == '\r' && c1 == '\n') ? 2 : (c0 == '\r') ? 1 : 0;
+
+            if (end != 0) {
+                char* dest = lst - num_trunc;
+                memmove(dest, lst, (fd + i) - lst);
+
+                file.lines.push_back(dest - fd);
+
+                num_trunc += end;
+                i += end;
+                lst = fd + i;
+            } else {
+                i++;
+            }
+        }
+
+        // truncate file to size minus sum of line endings
+        file.data.resize(file.data.size() - num_trunc);
+    }
+
+    // TODO: possibly not the longest line when line number is large enough
+    // format is [breakpoint] [ %-4d line number] [line]
+    file.longest_line_idx = 0;
+    size_t max_chars = 0;
+    size_t len = file.data.size();
+    for (size_t i = file.lines.size() - 1; i < file.lines.size(); i--) {
+        size_t this_line_len = len - file.lines[i];
+        if (max_chars < this_line_len) {
+            max_chars = this_line_len;
+            file.longest_line_idx = i;
+        }
+
+        len = file.lines[i];
+    }
+
+    fclose(f);
+    return true;
 }
 
 static void HelpText(const char* text)
@@ -3568,75 +3562,56 @@ int main(int argc, char** argv)
     } while (0)
 #define ExitMessage(msg) ExitMessagef("%s", msg)
 
-    static const auto Shutdown = []() {
+    atexit([]() {
         // shutdown imgui
-        if (gui.started_imgui_opengl2) {
+        if (gui.started_imgui_opengl2)
             ImGui_ImplOpenGL2_Shutdown();
-            gui.started_imgui_opengl2 = false;
-        }
-        if (gui.started_imgui_glfw) {
+
+        if (gui.started_imgui_glfw)
             ImGui_ImplGlfw_Shutdown();
-            gui.started_imgui_glfw = false;
-        }
-        if (gui.created_imgui_context) {
+
+        if (gui.created_imgui_context)
             ImGui::DestroyContext();
-            gui.created_imgui_context = false;
-        }
 
         // shutdown glfw
-        if (gui.window) {
+        if (gui.window)
             glfwDestroyWindow(gui.window);
-            gui.window = NULL;
-        }
-        if (gui.initialized_glfw) {
+
+        if (gui.initialized_glfw)
             glfwTerminate();
-            gui.initialized_glfw = false;
-        }
 
         // shutdown GDB
         if (gdb.thread_read_interp) {
             pthread_cancel(gdb.thread_read_interp);
             pthread_join(gdb.thread_read_interp, NULL);
-            gdb.thread_read_interp = 0;
         }
 
-        if (gdb.recv_block) {
+        if (gdb.recv_block)
             sem_close(gdb.recv_block);
-            gdb.recv_block = 0;
-        }
-        if (gdb.fd_ptty_master) {
+
+        if (gdb.fd_ptty_master)
             close(gdb.fd_ptty_master);
-            gdb.fd_ptty_master = 0;
-        }
-        if (gdb.fd_in_read) {
+
+        if (gdb.fd_in_read)
             close(gdb.fd_in_read);
-            gdb.fd_in_read = 0;
-        }
-        if (gdb.fd_out_read) {
+
+        if (gdb.fd_out_read)
             close(gdb.fd_out_read);
-            gdb.fd_out_read = 0;
-        }
-        if (gdb.fd_in_write) {
+
+        if (gdb.fd_in_write)
             close(gdb.fd_in_write);
-            gdb.fd_in_write = 0;
-        }
-        if (gdb.fd_out_write) {
+
+        if (gdb.fd_out_write)
             close(gdb.fd_out_write);
-            gdb.fd_out_write = 0;
-        }
-        if (gdb.spawned_pid) {
+
+        if (gdb.spawned_pid)
             EndProcess(gdb.spawned_pid);
-            gdb.spawned_pid = 0;
-        }
 
         pthread_mutex_t zmutex = {};
-        if (0 != memcmp(&zmutex, &gdb.modify_block, sizeof(pthread_mutex_t))) {
+        if (memcmp(&zmutex, &gdb.modify_block, sizeof(pthread_mutex_t)) != 0)
             pthread_mutex_destroy(&gdb.modify_block);
-            gdb.modify_block = zmutex;
-        }
-    };
+    });
 
-    atexit(Shutdown);
     {
         // GDB Init
         int rc = 0;
@@ -3722,40 +3697,17 @@ int main(int argc, char** argv)
         }
     }
 
-    // read in the command line args, skip exename argv[0]
-    for (int i = 1; i < argc;) {
-        String flag = argv[i++];
-        if (flag == "-h" || flag == "--help") {
-            const char* usage = "tug [flags]\n"
-                                "  --exe [executable filename to debug]\n"
-                                "  --gdb [GDB filename to use]\n"
-                                "  -h, --help see available flags to use\n";
-            printf("%s", usage);
-            return 1;
-        } else {
-            // flag requires an additional arg passed in
-            if (i >= argc)
-                ExitMessagef("missing %s param\n", flag.c_str());
-
-            else if (flag == "--gdb") {
-                gdb.filename = argv[i++];
-                if (!VerifyFileExecutable(gdb.filename.c_str()))
-                    return EXIT_FAILURE;
-            } else if (flag == "--exe") {
-                gdb.debug_filename = argv[i++];
-                if (!VerifyFileExecutable(gdb.debug_filename.c_str()))
-                    return EXIT_FAILURE;
-            } else {
-                ExitMessagef("unknown flag: %s\n", flag.c_str());
-            }
-        }
+    if (argc <= 1) {
+        ExitMessagef("missing %s param\n", "");
     }
 
-    if (gdb.filename != "" && !GDB_StartProcess(gdb.filename, "")) {
+    gdb.debug_filename = argv[1];
+
+    if (!gdb.filename.empty() && !GDB_StartProcess(gdb.filename, "")) {
         gdb.filename = "";
     }
 
-    if (gdb.spawned_pid != 0 && gdb.debug_filename != "") {
+    if (gdb.spawned_pid != 0 && !gdb.debug_filename.empty()) {
         if (GDB_SetInferiorExe(gdb.debug_filename)) {
             if (gdb.has_exec_run_start)
                 GDB_SendBlocking("-exec-run --start");
@@ -3767,41 +3719,32 @@ int main(int argc, char** argv)
     // load config
     int window_width = 1080;
     int window_height = 720;
-    int window_x = 0;
-    int window_y = 0;
     bool window_maximized = false;
-    bool window_has_x_or_y = false;
     bool cursor_blink = false;
 
     // initialize GLFW
-    {
-        glfwSetErrorCallback(glfw_error_callback);
-        gui.initialized_glfw = glfwInit();
-        if (!gui.initialized_glfw)
-            ExitMessage("glfwInit\n");
+    glfwSetErrorCallback(glfw_error_callback);
+    gui.initialized_glfw = glfwInit();
+    if (!gui.initialized_glfw)
+        ExitMessage("glfwInit\n");
 
-        glfwWindowHint(GLFW_MAXIMIZED, window_maximized);
-        gui.window = glfwCreateWindow(window_width, window_height, "Tug", NULL, NULL);
-        if (gui.window == NULL)
-            ExitMessage("glfwCreateWindow\n");
+    glfwWindowHint(GLFW_MAXIMIZED, window_maximized);
+    gui.window = glfwCreateWindow(window_width, window_height, "Tug", NULL, NULL);
+    if (gui.window == NULL)
+        ExitMessage("glfwCreateWindow\n");
 
-        glfwMakeContextCurrent(gui.window);
-        glfwSwapInterval(1); // Enable vsync
+    glfwMakeContextCurrent(gui.window);
+    glfwSwapInterval(1); // Enable vsync
 
-        if (!window_maximized && window_has_x_or_y) {
-            glfwSetWindowPos(gui.window, window_x, window_y);
-        }
-
-        const auto OnDragDrop = [](GLFWwindow* /*window*/, int count, const char** paths) {
-            if (count == 1) {
-                const char* file = paths[0];
-                if (VerifyFileExecutable(file)) {
-                    gui.drag_drop_exe_path = file;
-                }
+    const auto OnDragDrop = [](GLFWwindow* /*window*/, int count, const char** paths) {
+        if (count == 1) {
+            const char* file = paths[0];
+            if (VerifyFileExecutable(file)) {
+                gui.drag_drop_exe_path = file;
             }
-        };
-        glfwSetDropCallback(gui.window, OnDragDrop);
-    }
+        }
+    };
+    glfwSetDropCallback(gui.window, OnDragDrop);
 
     // Startup Dear ImGui
     if (!IMGUI_CHECKVERSION())
@@ -3823,7 +3766,7 @@ int main(int argc, char** argv)
 
     ImGuiIO& io = ImGui::GetIO();
     io.IniFilename = NULL; // manually load/save imgui.ini file
-    // io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
     // io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable; // Enable Docking
     io.ConfigInputTextCursorBlink = cursor_blink;
@@ -3882,19 +3825,6 @@ int main(int argc, char** argv)
                         PrintError("error loading default font?!?!?");
                 }
 
-                // if (use_default_font)
-                //{
-                //     ImFontConfig tmp = ImFontConfig();
-                //     tmp.SizePixels = font_size;
-                //     tmp.OversampleH = tmp.OversampleV = 1;
-                //     tmp.PixelSnapH = true;
-                //     result = io.Fonts->AddFontDefault(&tmp);
-                //     if (result == NULL)
-                //     {
-                //         PrintError("error loading default font?!?!?");
-                //     }
-                // }
-
                 return result;
             };
 
@@ -3939,9 +3869,8 @@ int main(int argc, char** argv)
         glfwSwapBuffers(gui.window);
     }
 
-    window_maximized = (0 != glfwGetWindowAttrib(gui.window, GLFW_MAXIMIZED));
+    window_maximized = (glfwGetWindowAttrib(gui.window, GLFW_MAXIMIZED) != 0);
     if (!window_maximized) {
-        glfwGetWindowPos(gui.window, &window_x, &window_y);
         glfwGetWindowSize(gui.window, &window_width, &window_height);
     }
 
