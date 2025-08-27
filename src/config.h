@@ -1,21 +1,8 @@
-// Copyright (C) 2022 Kyle Sylvestre
-// 
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-// 
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-// 
-// You should have received a copy of the GNU General Public License
-// along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
 #pragma once
 
-const char *const default_ini = R"(
+namespace config {
+
+static const char* const default_ini = R"(
 [Tug]
 Callstack=true
 Locals=true
@@ -107,5 +94,9 @@ DockSpace       ID=0x8B93E3BD Window=0xA787BDB4 Pos=0,19 Size=1280,701 Split=X
       DockNode  ID=0x00000007 Parent=0x00000005 SizeRef=376,231 Selected=0x7BFCF530
       DockNode  ID=0x00000008 Parent=0x00000005 SizeRef=376,228 Selected=0x2924BF46
     DockNode    ID=0x00000006 Parent=0x00000002 SizeRef=376,238 Selected=0xFEB5AC5E
-
 )";
+
+void load(GUI& gui);
+void save(const GUI& gui);
+
+}
