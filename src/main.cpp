@@ -3645,7 +3645,7 @@ void load_config(const std::string& ini_data)
     };
 
     const auto LoadBool = [&](String key, bool default_value) -> bool {
-        return ("0" != LoadString(key, default_value ? "1" : "0"));
+        return ("false" != LoadString(key, default_value ? "true" : "false"));
     };
 
     gui.show_callstack = LoadBool("Callstack", true);
@@ -3709,14 +3709,14 @@ void save_config()
     file << "[Tug]\n";
 
     // save docking tab visibility, imgui doesn't save this at the moment
-    file << std::format("Callstack={}\n", gui.show_callstack);
-    file << std::format("Locals={}\n", gui.show_locals);
-    file << std::format("Registers={}\n", gui.show_registers);
-    file << std::format("Watch={}\n", gui.show_watch);
-    file << std::format("Control={}\n", gui.show_control);
-    file << std::format("Source={}\n", gui.show_source);
-    file << std::format("Breakpoints={}\n", gui.show_breakpoints);
-    file << std::format("Threads={}\n", gui.show_threads);
+    file << std::format("Callstack={}\n", (int)gui.show_callstack);
+    file << std::format("Locals={}\n", (int)gui.show_locals);
+    file << std::format("Registers={}\n",(int)gui.show_registers);
+    file << std::format("Watch={}\n",(int)gui.show_watch);
+    file << std::format("Control={}\n", (int)gui.show_control);
+    file << std::format("Source={}\n", (int)gui.show_source);
+    file << std::format("Breakpoints={}\n", (int)gui.show_breakpoints);
+    file << std::format("Threads={}\n", (int)gui.show_threads);
     file << std::format("DirectoryViewer={}\n", gui.show_directory_viewer);
     file << std::format("FontFilename={}\n", gui.font_filename.c_str());
     file << std::format("FontSize={}\n", gui.font_size);
