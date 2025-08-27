@@ -41,16 +41,6 @@
 #include <sys/time.h>
 #include <sys/stat.h>
 
-#if defined(__APPLE__)
-int sem_timedwait(sem_t* sem, const struct timespec* abs_timeout);
-#endif
-
-#if defined(__CYGWIN__)
-#include <dirent.h>
-#endif
-
-template <typename T>
-using Vector = std::vector<T>;
 using String = std::basic_string<char, std::char_traits<char>>;
 
 #define VARGS_CHECK(fmt, ...) (0 && snprintf(NULL, 0, fmt, __VA_ARGS__))
@@ -192,7 +182,7 @@ struct DisassemblySourceLine {
 };
 
 struct File {
-    Vector<size_t> lines; // offset to line within data
+    std::vector<size_t> lines; // offset to line within data
     String filename;
     String data; // file chars excluding line endings
     size_t longest_line_idx; // line with most chars, used for horizontal scrollbar
@@ -232,7 +222,7 @@ struct Record {
     uint32_t id;
 
     // data describing the line elements
-    Vector<RecordAtom> atoms;
+    std::vector<RecordAtom> atoms;
 
     // line buffer, RecordAtom name/value strings point to data inside this
     String buf;
@@ -250,7 +240,7 @@ struct VarObj {
 
     // structs, unions, arrays
     Record expr;
-    Vector<bool> expr_changed;
+    std::vector<bool> expr_changed;
 };
 
 // run length RecordAtom in expression value
@@ -326,7 +316,7 @@ struct GDB {
     // raw data, guarded by modify_storage_lock
     // a block is one or more Records
     char block_data[1024 * 1024];
-    Vector<Span> block_spans; // pipe read span into block_data
+    std::vector<Span> block_spans; // pipe read span into block_data
 
     // capabilities of the spawned GDB process using -list-features
     bool has_frozen_varobj;
@@ -358,24 +348,24 @@ struct Program {
 
     // GDB console history buffer
     String input_cmd_data;
-    Vector<size_t> input_cmd_offsets;
+    std::vector<size_t> input_cmd_offsets;
     int input_cmd_idx = -1;
 
-    Vector<VarObj> local_vars; // locals for the current frame
-    Vector<VarObj> global_vars; // watch for entire program, -var-create name @ expr
-    Vector<VarObj> watch_vars; // user defined watch for entire program
+    std::vector<VarObj> local_vars; // locals for the current frame
+    std::vector<VarObj> global_vars; // watch for entire program, -var-create name @ expr
+    std::vector<VarObj> watch_vars; // user defined watch for entire program
     bool running;
     bool started;
     bool source_out_of_date;
-    Vector<Breakpoint> breakpoints;
+    std::vector<Breakpoint> breakpoints;
     // TODO: threads, active_thread
 
-    Vector<RecordHolder> read_recs;
+    std::vector<RecordHolder> read_recs;
     size_t num_recs;
 
-    Vector<File> files;
-    Vector<Thread> threads;
-    Vector<Frame> frames;
+    std::vector<File> files;
+    std::vector<Thread> threads;
+    std::vector<Frame> frames;
     size_t frame_idx = BAD_INDEX;
     size_t file_idx = BAD_INDEX;
     size_t thread_idx = BAD_INDEX;
@@ -391,4 +381,4 @@ void WriteToConsoleBuffer(const char* raw, size_t rawsize);
 bool VerifyFileExecutable(const char* filename);
 bool DoesFileExist(const char* filename, bool print_error_on_missing = true);
 bool DoesProcessExist(pid_t p);
-bool InvokeShellCommand(String command, String& output);
+bool InvokeShellCommand(std::string_view command, String& output);

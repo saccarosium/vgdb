@@ -17,7 +17,7 @@
 
 struct ParseRecordContext
 {
-    Vector<RecordAtom> atoms;
+    std::vector<RecordAtom> atoms;
     size_t atom_idx;
     size_t num_end_atoms;   // contiguous atoms stored at the end of atoms
 

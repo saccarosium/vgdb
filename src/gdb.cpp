@@ -121,7 +121,7 @@ bool GDB_StartProcess(String gdb_filename, String gdb_args)
         size_t startoff = 0;
         size_t spaceoff = 0;
         size_t bufoff = 0;
-        Vector<char *> gdb_argv;
+        std::vector<char *> gdb_argv;
         bool inside_string = false;
         bool is_whitespace = true;
 
@@ -163,7 +163,7 @@ bool GDB_StartProcess(String gdb_filename, String gdb_args)
 
         // get all the environment variables for the process
         String env;
-        Vector<char *> envptr;
+        std::vector<char *> envptr;
         if (!InvokeShellCommand("printenv", env))
             return false;
 

@@ -146,13 +146,13 @@ String _StringPrintf(int /* vargs_check */, const char* fmt, ...)
     return result;
 }
 
-bool InvokeShellCommand(String command, String& output)
+bool InvokeShellCommand(std::string_view command, String& output)
 {
     bool result = false;
     output.clear();
-    FILE* f = popen(command.c_str(), "r");
+    FILE* f = popen(command.data(), "r");
     if (f == NULL) {
-        PrintErrorf("popen shell command \"%s\" %s\n", command.c_str(), GetErrorString(errno));
+        PrintErrorf("popen shell command \"%s\" %s\n", command.data(), GetErrorString(errno));
     } else {
         errno = 0;
         char tmp[1024] = {};
@@ -161,7 +161,7 @@ bool InvokeShellCommand(String command, String& output)
             output.insert(output.size(), tmp, bytes_read);
 
         if (ferror(f)) {
-            PrintErrorf("error reading shell command \"%s\"\n", command.c_str());
+            PrintErrorf("error reading shell command \"%s\"\n", command.data());
         } else {
             result = true;
         }
@@ -173,23 +173,9 @@ bool InvokeShellCommand(String command, String& output)
     return result;
 }
 
-bool DoesFileExist(const char* filename, bool print_error_on_missing)
+inline bool DoesProcessExist(pid_t p)
 {
-    struct stat st = {};
-    bool result = false;
-    if (0 > stat(filename, &st)) {
-        if ((errno == ENOENT && print_error_on_missing) || errno != ENOENT)
-            PrintErrorf("stat \"%s\" %s\n", filename, GetErrorString(errno));
-    } else {
-        result = true;
-    }
-
-    return result;
-}
-
-bool DoesProcessExist(pid_t p)
-{
-    return DoesFileExist(StringPrintf("/proc/%d", (int)p).c_str(), false);
+    return std::filesystem::exists(std::format("/proc/{}", (int)p));
 }
 
 void EndProcess(pid_t p)
@@ -276,8 +262,8 @@ struct Session {
 struct GUI {
     GLFWwindow* window;
     LineDisplay line_display = LineDisplay_Source;
-    Vector<DisassemblyLine> line_disasm;
-    Vector<DisassemblySourceLine> line_disasm_source;
+    std::vector<DisassemblyLine> line_disasm;
+    std::vector<DisassemblySourceLine> line_disasm_source;
     bool show_machine_interpreter_commands;
 
     Jump jump_type;
@@ -314,7 +300,7 @@ struct GUI {
     bool show_tutorial;
     bool show_about_tug;
     WindowTheme window_theme = WindowTheme_DarkBlue;
-    Vector<Session> session_history;
+    std::vector<Session> session_history;
     int hover_delay_ms;
     String drag_drop_exe_path;
 
@@ -1110,7 +1096,7 @@ void QueryFrame(bool force_clear_locals)
                 // same as what GDB does in source-cache.c
                 struct stat source_st = {};
                 struct stat exe_st = {};
-                if (DoesFileExist(file.filename.c_str(), false)
+                if (std::filesystem::exists(file.filename)
                     && (0 > stat(file.filename.c_str(), &source_st)
                         || 0 > stat(gdb.debug_filename.c_str(), &exe_st))) {
                     PrintErrorf("stat %s\n", GetErrorString(errno));
@@ -1177,7 +1163,7 @@ void QueryFrame(bool force_clear_locals)
 
     const RecordAtom* vars = GDB_ExtractAtom("variables", rec);
     size_t start_locals_length = prog.local_vars.size();
-    Vector<bool> var_found(start_locals_length);
+    std::vector<bool> var_found(start_locals_length);
 
     for (const RecordAtom& child : GDB_IterChild(rec, vars)) {
         VarObj incoming = CreateVarObj(
@@ -1472,7 +1458,7 @@ void Draw()
             }
         }
 
-        static Vector<RegisterName> all_registers;
+        static std::vector<RegisterName> all_registers;
         static bool show_register_window = false;
         static bool is_debug_program_open = false;
 
@@ -1670,7 +1656,7 @@ void Draw()
 
             if (ImGui::Checkbox("Use Default Font (Liberation Mono)", &gui.use_default_font)) {
                 if (gui.use_default_font
-                    || (gui.font_filename != "" && DoesFileExist(gui.font_filename.c_str()))) {
+                    || (gui.font_filename != "" && std::filesystem::exists(gui.font_filename))) {
                     gui.change_font = true;
                 }
             }
@@ -1713,7 +1699,7 @@ void Draw()
 
             if (changed_font_filename) {
                 bool good_font = false;
-                if (DoesFileExist(font_filename)) {
+                if (std::filesystem::exists(font_filename)) {
                     const char* ext = strrchr(font_filename, '.');
                     if (ext == NULL
                         || !(0 == strcasecmp(ext, ".otf") || 0 == strcasecmp(ext, ".ttf"))) {
@@ -2535,7 +2521,7 @@ void Draw()
         };
 
         // show autocomplete modal after pressing tab on input
-        static Vector<String> phrases;
+        static std::vector<String> phrases;
         static size_t phrase_idx;
         static String query_phrase;
 
@@ -3244,7 +3230,7 @@ void Draw()
         struct FileEntry {
             unsigned char dirent_d_type; // dirent.d_type
             String filename;
-            Vector<FileEntry> entries;
+            std::vector<FileEntry> entries;
             bool queried;
             FileEntry(String fn, unsigned char d_type)
             {
@@ -3720,7 +3706,7 @@ int main(int argc, char** argv)
         String tmp;
         if (InvokeShellCommand("which gdb", tmp)) {
             std::erase_if(tmp, [](char c) { return c == '\r' || c == '\n' || c == ' '; });
-            if (DoesFileExist(tmp.c_str(), false))
+            if (std::filesystem::exists(tmp))
                 gdb.filename = tmp;
         }
 
