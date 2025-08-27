@@ -3581,7 +3581,7 @@ std::filesystem::path get_config_path()
         config_path = std::format("{}/.config", home);
     }
 
-    return std::format("{}/tug.ini", config_path);
+    return std::format("{}/tug/config.ini", config_path);
 }
 
 std::string read_config()
