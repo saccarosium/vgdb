@@ -1,23 +1,6 @@
-#pragma once
+namespace layout {
 
-namespace config {
-
-static const char* const default_ini = R"(
-[Tug]
-Callstack=true
-Locals=true
-Watch=true
-Source=true
-Control=true
-Breakpoints=false
-Threads=false
-Registers=false
-DirectoryViewer=false
-FontFilename=
-FontSize=
-WindowTheme=DarkBlue
-
-; ImGui Begin
+static const char* const default_layout = R"(
 [Window][DockingWindow]
 Size=1270,720
 Collapsed=0
@@ -96,7 +79,64 @@ DockSpace       ID=0x8B93E3BD Window=0xA787BDB4 Pos=0,19 Size=1280,701 Split=X
     DockNode    ID=0x00000006 Parent=0x00000002 SizeRef=376,238 Selected=0xFEB5AC5E
 )";
 
-void load(GUI& gui);
-void save(const GUI& gui);
+static std::filesystem::path get_path()
+{
+    std::string config_path;
+    const char* xdg_config_env = getenv("XDG_CONFIG_HOME");
+    if (xdg_config_env != NULL) {
+        config_path = xdg_config_env;
+    } else {
+        const char* home = getenv("HOME");
+        config_path = std::format("{}/.config", home);
+    }
+
+    return std::format("{}/imgdb/layout.ini", config_path);
+}
+
+static std::string read()
+{
+    std::filesystem::path config_path(get_path());
+    if (!std::filesystem::exists(config_path) || !std::filesystem::is_regular_file(config_path))
+        return default_layout;
+
+    std::ifstream file(config_path, std::ios::binary | std::ios::ate);
+    if (!file)
+        return default_layout;
+
+    std::streamsize size = file.tellg();
+    file.seekg(0, std::ios::beg);
+
+    std::string buffer(static_cast<std::size_t>(size), '\0');
+    if (!file.read(buffer.data(), size))
+        return default_layout;
+
+    return buffer;
+}
+
+void load()
+{
+    std::string ini_data(read());
+    ImGui::LoadIniSettingsFromMemory(ini_data.data(), ini_data.size());
+}
+
+void save()
+{
+    std::filesystem::path config_path(get_path());
+
+    std::filesystem::path config_dirname(config_path.parent_path());
+    if (!std::filesystem::exists(config_dirname))
+        std::filesystem::create_directories(config_dirname);
+
+    std::ofstream file(config_path, std::ios::binary);
+    if (!file)
+        return;
+
+    size_t imgui_ini_size = 0;
+    const char* imgui_ini_data = ImGui::SaveIniSettingsToMemory(&imgui_ini_size);
+    if (imgui_ini_data == NULL)
+        return;
+    
+    file.write(imgui_ini_data, imgui_ini_size);
+}
 
 }

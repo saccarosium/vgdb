@@ -288,20 +288,20 @@ struct GUI {
     ImVec2 tutorial_window_pos;
     String tutorial_widget_description;
 
-    bool show_source;
-    bool show_control;
-    bool show_callstack;
-    bool show_registers;
-    bool show_locals;
-    bool show_watch;
-    bool show_breakpoints;
-    bool show_threads;
-    bool show_directory_viewer;
-    bool show_tutorial;
-    bool show_about_tug;
+    bool show_source = true;
+    bool show_control = true;
+    bool show_callstack = true;
+    bool show_registers = false;
+    bool show_locals = true;
+    bool show_watch = true;
+    bool show_breakpoints = false;
+    bool show_threads = false;
+    bool show_directory_viewer = false;
+    bool show_tutorial = false;
+    bool show_about_tug = false;
     WindowTheme window_theme = WindowTheme_DarkBlue;
     std::vector<Session> session_history;
-    int hover_delay_ms;
+    int hover_delay_ms = 100;
     String drag_drop_exe_path;
 
     // shutdown variables
@@ -312,8 +312,8 @@ struct GUI {
 };
 
 // TODO(sacca): remove this abomination
-#include "config.h"
-#include "config.cpp"
+#include "layout.h"
+#include "layout.cpp"
 
 Program prog;
 GDB gdb;
@@ -3716,20 +3716,13 @@ int main(int argc, char** argv)
         }
     }
 
-    // load config
-    int window_width = 1080;
-    int window_height = 720;
-    bool window_maximized = false;
-    bool cursor_blink = false;
-
     // initialize GLFW
     glfwSetErrorCallback(glfw_error_callback);
     gui.initialized_glfw = glfwInit();
     if (!gui.initialized_glfw)
         ExitMessage("glfwInit\n");
 
-    glfwWindowHint(GLFW_MAXIMIZED, window_maximized);
-    gui.window = glfwCreateWindow(window_width, window_height, "Tug", NULL, NULL);
+    gui.window = glfwCreateWindow(1080, 720, "ImGDB", NULL, NULL);
     if (gui.window == NULL)
         ExitMessage("glfwCreateWindow\n");
 
@@ -3762,14 +3755,13 @@ int main(int argc, char** argv)
     if (!gui.started_imgui_opengl2)
         ExitMessage("ImGui_ImplOpenGL2_Init\n");
 
-    config::load(gui);
+    layout::load();
 
     ImGuiIO& io = ImGui::GetIO();
     io.IniFilename = NULL; // manually load/save imgui.ini file
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
     // io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable; // Enable Docking
-    io.ConfigInputTextCursorBlink = cursor_blink;
 
     // Setup Dear ImGui style
     SetWindowTheme(gui.window_theme);
@@ -3869,12 +3861,7 @@ int main(int argc, char** argv)
         glfwSwapBuffers(gui.window);
     }
 
-    window_maximized = (glfwGetWindowAttrib(gui.window, GLFW_MAXIMIZED) != 0);
-    if (!window_maximized) {
-        glfwGetWindowSize(gui.window, &window_width, &window_height);
-    }
-
-    config::save(gui);
+    layout::save();
 
     // Shutdown lambda called here from atexit
     return EXIT_SUCCESS;
