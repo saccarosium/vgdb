@@ -284,10 +284,6 @@ struct GUI {
     ImFont* source_font;
     float source_font_size = DEFAULT_FONT_SIZE;
 
-    ImGuiID tutorial_id = 0;
-    ImVec2 tutorial_window_pos;
-    String tutorial_widget_description;
-
     bool show_source = true;
     bool show_control = true;
     bool show_callstack = true;
@@ -297,7 +293,6 @@ struct GUI {
     bool show_breakpoints = false;
     bool show_threads = false;
     bool show_directory_viewer = false;
-    bool show_tutorial = false;
     bool show_about_tug = false;
     WindowTheme window_theme = WindowTheme_DarkBlue;
     std::vector<Session> session_history;
@@ -438,23 +433,6 @@ bool LoadFile(File& file)
 
     fclose(f);
     return true;
-}
-
-static void HelpText(const char* text)
-{
-    // when in the tutorial mode, hover over items to see its description
-    if (gui.show_tutorial && gui.tutorial_id == ImGui::GetID("")) {
-        ImVec2 rmin = ImGui::GetItemRectMin();
-        ImVec2 rmax = ImGui::GetItemRectMax();
-        ImGui::GetWindowDrawList()->AddRectFilled(rmin, rmax, IM_COL32(0, 255, 0, 64));
-
-        if (ImGui::IsItemHovered()) {
-            ImGui::SetNextWindowPos(ImVec2(rmin.x, rmax.y));
-            ImGui::BeginTooltip();
-            ImGui::TextUnformatted(text);
-            ImGui::EndTooltip();
-        }
-    }
 }
 
 static size_t FindOrCreateFile(const String& filename)
@@ -1597,9 +1575,6 @@ void Draw()
             if (ImGui::Button("About Tug"))
                 open_about_tug = true;
 
-            if (ImGui::Button("View Tutorial"))
-                gui.show_tutorial = true;
-
             if (ImGui::Button("Configure Registers##Button")) {
                 show_register_window = true;
                 all_registers.clear();
@@ -2409,7 +2384,6 @@ void Draw()
             gui.jump_type = Jump_Goto;
             gui.goto_line_idx = prog.frames[prog.frame_idx].line_idx;
         }
-        HelpText("Jump to the next line to be executed");
 
         // resume execution
         ImGui::SameLine();
@@ -2420,9 +2394,6 @@ void Draw()
                 GDB_SendBlocking("-exec-run");
         }
 
-        HelpText("start executing the program.\n"
-                 "gdb equivalent is \"run\" on startup and \"continue\" on resuming execution");
-
         // send SIGINT
         ImGui::SameLine();
         if (ImGui::Button("||##Pause")) {
@@ -2431,27 +2402,18 @@ void Draw()
 
             GDB_SendBlocking("-exec-interrupt --all");
         }
-        HelpText("Interrupt the execution of the debugged program.\n"
-                 "gdb equivalent is \"interrupt\"");
 
         // step line
         ImGui::SameLine();
         if (ImGui::Button("-->")) {
             ExecuteCommand("-exec-step", false);
         }
-        HelpText("Step program until it reaches a different source line.\n"
-                 "gdb equivalent is \"step\"");
 
         // step over
         ImGui::SameLine();
         if (ImGui::Button("/\\>")) {
             ExecuteCommand("-exec-next", false);
         }
-        HelpText("Step program, proceeding through subroutine calls.\n"
-                 "Unlike \"step\", if the current source line calls a subroutine,\n"
-                 "this command does not enter the subroutine, but instead steps over\n"
-                 "the call, in effect treating it as a single source line.\n"
-                 "gdb equivalent is \"next\"");
 
         // step out
         ImGui::SameLine();
@@ -2464,8 +2426,6 @@ void Draw()
                 ExecuteCommand("-exec-finish", false);
             }
         }
-        HelpText("Execute until selected stack frame returns.\n"
-                 "gdb equivalent is \"finish\"");
 
         if (prog.source_out_of_date) {
             ImGui::SameLine();
@@ -3002,14 +2962,12 @@ void Draw()
             ImGui::TableSetColumnIndex(0);
             if (ImGui::Button("X##BreakpointDeleteAll") && GDB_SendBlocking("-break-delete --all"))
                 prog.breakpoints.clear();
-            HelpText("Delete all of the breakpoints and watchpoints");
 
             ImGui::SameLine();
             if (ImGui::Checkbox("##BreakpointEnableAll", &tmp)
                 && GDB_SendBlocking("-break-enable --all"))
                 for (Breakpoint& b : prog.breakpoints)
                     b.enabled = true;
-            HelpText("Enable all of the breakpoints");
 
             tmp = false;
             ImGui::SameLine();
@@ -3017,15 +2975,12 @@ void Draw()
                 && GDB_SendBlocking("-break-disable --all"))
                 for (Breakpoint& b : prog.breakpoints)
                     b.enabled = false;
-            HelpText("Disable all of the breakpoints");
 
             ImGui::TableSetColumnIndex(1);
             ImGui::TableHeader("Number");
 
             ImGui::TableSetColumnIndex(2);
             ImGui::TableHeader("Condition");
-            HelpText("Click this row cell to set a condition for the breakpoint\n"
-                     "this input box is disabled for watchpoints");
 
             ImGui::TableSetColumnIndex(3);
             ImGui::TableHeader("Line");
@@ -3148,24 +3103,20 @@ void Draw()
             if (ImGui::Checkbox("##ThreadFocusAll", &tmp))
                 for (Thread& t : prog.threads)
                     t.focused = true;
-            HelpText("focus all of the threads");
 
             tmp = false;
             ImGui::SameLine();
             if (ImGui::Checkbox("##ThreadUnfocusAll", &tmp))
                 for (Thread& t : prog.threads)
                     t.focused = false;
-            HelpText("unfocus all of the threads");
 
             ImGui::TableSetColumnIndex(1);
             if (ImGui::Button("|>##ResumeAll") && prog.threads.size() > 0)
                 GDB_SendBlocking("-exec-continue --all");
-            HelpText("continue all of the threads");
 
             ImGui::TableSetColumnIndex(2);
             if (ImGui::Button("||##PauseAll"))
                 GDB_SendBlocking("-exec-interrupt --all");
-            HelpText("interrupt all of the threads");
 
             ImGui::TableSetColumnIndex(3);
             ImGui::TableHeader("Name");
@@ -3341,113 +3292,6 @@ void Draw()
             }
 
             query_output = NULL;
-        }
-
-        ImGui::End();
-    }
-
-    if (gui.show_tutorial) {
-        static int window_idx = 0;
-        ImGui::SetNextWindowSize(MIN_WINSIZE, ImGuiCond_Once);
-        ImGui::Begin("Tutorial", &gui.show_tutorial, ImGuiWindowFlags_AlwaysAutoResize);
-
-        const char* window_names[] = {
-            "Source",
-            "Control",
-            "Locals",
-            "Callstack",
-            "Registers",
-            "Watch",
-            "Breakpoints",
-            "Threads",
-            "Directory Viewer",
-        };
-
-        ImGui::Text("Hover over green objects to learn more about them");
-        ImGui::Combo("window", &window_idx, window_names, ArrayCount(window_names));
-        // if (ImGui::Button("Previous Window") && window_idx > 0)
-        //     window_idx--;
-        // if (ImGui::Button("Next Window") && window_idx + 1 < WINDOW_COUNT)
-        //     window_idx++;
-
-        const auto Tab = [](int num) {
-            ImGui::Text("%*c", num, ' ');
-            ImGui::SameLine();
-        };
-
-        gui.tutorial_id = ImHashStr(window_names[window_idx]);
-        switch (window_idx) {
-        case 0:
-            gui.show_source = true;
-            ImGui::Text("View source code file of the program being run");
-            ImGui::Text("Open file by clicking menu button \"File > Open...\" or clicking a "
-                        "filename in the "
-                        "\"Directory Viewer\" window");
-            ImGui::Text("Ctrl-G: Open \"Goto Line\" window:");
-            Tab(1);
-            ImGui::BulletText("Input a line number and press enter to jump to it");
-            ImGui::Text("Ctrl-F: Open \"Find\" search bar:");
-            Tab(1);
-            ImGui::BulletText("Press N to search forwards");
-            Tab(1);
-            ImGui::BulletText("Press Shift-N to search backwards");
-            break;
-        case 1:
-            gui.show_control = true;
-            ImGui::Text("Alter the execution state of the program");
-            ImGui::Text("The input line at the bottom is piped to a spawned GDB process");
-            Tab(1);
-            ImGui::BulletText("The default GDB filename is the one returned by \"which gdb\"");
-            Tab(1);
-            ImGui::BulletText("Repeat the last command by pressing enter on an empty line");
-            Tab(1);
-            ImGui::BulletText("Press tab after partially typing a phrase to show autocompletions");
-            Tab(2);
-            ImGui::BulletText("Cycle Up/Down with Tab/Shift Tab");
-            Tab(2);
-            ImGui::BulletText("Press Enter or click phrase to finish the autocompletion");
-            break;
-        case 2:
-            gui.show_locals = true;
-            ImGui::Text("View variables in scope within the current stack frame");
-            break;
-        case 3:
-            gui.show_callstack = true;
-            ImGui::Text("Frames of the callstack. Jump to a frame by clicking its row");
-            break;
-        case 4:
-            gui.show_registers = true;
-            ImGui::Text("View values of CPU registers.");
-            ImGui::Text("Configure shown registers by hitting menu button \"Settings\" then "
-                        "\"Configure Registers\"");
-            break;
-        case 5:
-            gui.show_watch = true;
-            ImGui::Text("View values of variables entered");
-            ImGui::Text("To view register values, prefix its name with '$' character");
-            ImGui::Text("Supports \"array, length\" syntax");
-            ImGui::Text("Click a name to edit the value, press delete while clicked to delete it");
-            break;
-        case 6:
-            gui.show_breakpoints = true;
-            ImGui::Text("View breakpoints and watchpoints of a program");
-            gui.tutorial_id = ImHashStr("##BreakpointsTable", 0, ImHashStr("Breakpoints"));
-            break;
-        case 7:
-            gui.show_threads = true;
-            gui.tutorial_id = ImHashStr("##ThreadsTable", 0, ImHashStr("Threads"));
-            ImGui::Text("View threads of a program");
-            ImGui::Text("Far left column contains the focused threads: ones selected to step, "
-                        "continue, next");
-            Tab(1);
-            ImGui::BulletText("Shift-LeftClick a checkbox to make it the only one focused");
-            break;
-        case 8:
-            gui.show_directory_viewer = true;
-            ImGui::Text("View files of a directory, defaults to current working directory \".\" ");
-            ImGui::Text("Click a filename to view it in the \"Source\" window");
-            ImGui::Text("Click the \"...\" button to change directories");
-            break;
         }
 
         ImGui::End();
