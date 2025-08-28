@@ -1,6 +1,7 @@
 debug_misc
 *.ini
 **/build
+.cache
 ignore
 output
 tags
