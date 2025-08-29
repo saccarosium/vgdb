@@ -277,7 +277,6 @@ struct GUI {
     // use two font sizes: global and source window
     // change source window size with CTRL+Scroll or settings option
     bool use_default_font = true;
-    bool change_font = true;
     ImFont* default_font;
     float font_size = DEFAULT_FONT_SIZE;
     String font_filename;
@@ -1570,136 +1569,6 @@ void Draw()
             ImGui::EndMenu();
         }
 
-        static bool is_settings_open = false;
-        if (ImGui::BeginMenu("Settings")) {
-            if (ImGui::Button("About Tug"))
-                open_about_tug = true;
-
-            if (ImGui::Button("Configure Registers##Button")) {
-                show_register_window = true;
-                all_registers.clear();
-                GDB_SendBlocking("-data-list-register-names", rec);
-                const RecordAtom* regs = GDB_ExtractAtom("register-names", rec);
-
-                for (const RecordAtom& reg : GDB_IterChild(rec, regs)) {
-                    RegisterName add = {};
-                    add.text = GetAtomString(reg.value, rec);
-                    if (add.text != "") {
-                        String to_find = GLOBAL_NAME_PREFIX + add.text;
-                        add.registered = false;
-                        for (const VarObj& iter : prog.global_vars) {
-                            if (iter.name == add.text) {
-                                add.registered = true;
-                                break;
-                            }
-                        }
-                        all_registers.emplace_back(add);
-                    }
-                }
-            }
-
-            // line display: how to present the debugged executable:
-            LineDisplay last_line_display = gui.line_display;
-            ImGui::SetNextItemWidth(160.0f);
-            ImGui::Combo("View Files As...##Settings", reinterpret_cast<int*>(&gui.line_display),
-                "Source\0Disassembly\0Source And Disassembly\0");
-
-            if (last_line_display == LineDisplay_Source && gui.line_display != LineDisplay_Source
-                && prog.frame_idx < prog.frames.size()) {
-                // query the disassembly for this function
-                GetFunctionDisassembly(prog.frames[prog.frame_idx]);
-            }
-
-            ImGui::Checkbox("Cursor Blink", &ImGui::GetIO().ConfigInputTextCursorBlink);
-
-            static FileWindowContext ctx;
-            static char font_filename[PATH_MAX];
-            static bool show_font_picker = false;
-            bool changed_font_filename = false;
-
-            if (!is_settings_open) {
-                // just opened the settings menu
-                is_settings_open = true;
-                tsnprintf(font_filename, "%s", gui.font_filename.c_str());
-            }
-
-            if (ImGui::Checkbox("Use Default Font (Liberation Mono)", &gui.use_default_font)) {
-                if (gui.use_default_font
-                    || (gui.font_filename != "" && std::filesystem::exists(gui.font_filename))) {
-                    gui.change_font = true;
-                }
-            }
-
-            float fsz = gui.font_size;
-            bool changed_font_point = false;
-            ImGuiDisabled(!gui.use_default_font && gui.font_filename == "",
-                changed_font_point = ImGui::InputFloat(
-                    "Font Size", &fsz, 1.0f, 0.0f, "%.0f", ImGuiInputTextFlags_EnterReturnsTrue));
-            if (changed_font_point) {
-                gui.font_size = GetPinned(fsz, MIN_FONT_SIZE, MAX_FONT_SIZE);
-                gui.source_font_size = gui.font_size;
-                gui.change_font = true;
-            }
-
-            float sfsz = gui.source_font_size;
-            bool changed_source_font_point = false;
-            ImGuiDisabled(!gui.use_default_font && gui.font_filename == "",
-                changed_source_font_point = ImGui::InputFloat("Source Font Size", &sfsz, 1.0f, 0.0f,
-                    "%.0f", ImGuiInputTextFlags_EnterReturnsTrue));
-            if (changed_source_font_point) {
-                gui.source_font_size = GetPinned(sfsz, MIN_FONT_SIZE, MAX_FONT_SIZE);
-                gui.change_font = true;
-            }
-
-            ImGuiDisabled(gui.use_default_font,
-                changed_font_filename = ImGui::InputText("Font Filename", font_filename,
-                    sizeof(font_filename), ImGuiInputTextFlags_EnterReturnsTrue));
-            ImGui::SameLine();
-            ImGuiDisabled(gui.use_default_font, show_font_picker |= ImGui::Button("...##font"));
-
-            if (show_font_picker
-                && ImGuiFileWindow(ctx, ImGuiFileWindowMode_SelectFile, ".", "ttf,otf")) {
-                show_font_picker = false;
-                if (ctx.selected) {
-                    changed_font_filename = true;
-                    tsnprintf(font_filename, "%s", ctx.path.c_str());
-                }
-            }
-
-            if (changed_font_filename) {
-                bool good_font = false;
-                if (std::filesystem::exists(font_filename)) {
-                    const char* ext = strrchr(font_filename, '.');
-                    if (ext == NULL
-                        || !(0 == strcasecmp(ext, ".otf") || 0 == strcasecmp(ext, ".ttf"))) {
-                        PrintError("invalid font, choose .otf or .ttf file\n");
-                    } else {
-                        good_font = true;
-                        gui.font_filename = font_filename;
-                        gui.change_font = true;
-                    }
-                }
-
-                if (!good_font)
-                    font_filename[0] = '\0';
-            }
-
-            int temp_theme = gui.window_theme;
-            if (ImGui::Combo(
-                    "Window Theme##Settings", &temp_theme, "Light\0Dark Purple\0Dark Blue\0"))
-                SetWindowTheme((WindowTheme)temp_theme);
-
-            static int temp_hover_delay_ms = gui.hover_delay_ms;
-            if (ImGui::InputInt("Hover Delay", &temp_hover_delay_ms, 1, 1,
-                    ImGuiInputTextFlags_EnterReturnsTrue)) {
-                gui.hover_delay_ms = temp_hover_delay_ms;
-            }
-
-            ImGui::EndMenu();
-        } else {
-            is_settings_open = false;
-        }
-
         // modify register window: query GDB for the list of register
         // names then let the user pick which ones to use
         if (show_register_window) {
@@ -1777,7 +1646,6 @@ void Draw()
             // increase/decrease the font
             float tmp = GetPinned(gui.source_font_size + ImGui::GetIO().MouseWheel, 8.0f, 72.0f);
             if (gui.source_font_size != tmp) {
-                gui.change_font = true;
                 gui.source_font_size = tmp;
             }
         }
@@ -3616,7 +3484,6 @@ int main(int argc, char** argv)
     // change font data before it gets locked with NewFrame
     // TODO: reloading both fonts when source font changes, might change to font scaling
     // instead
-    gui.change_font = false;
     io.Fonts->Clear();
     ImGui_ImplOpenGL2_DestroyFontsTexture();
 
