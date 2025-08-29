@@ -23,7 +23,8 @@ SOURCES = ./src/context.c\
 		  ./src/osmesa_context.c\
 		  ./src/null_init.c\
 		  ./src/null_monitor.c\
-		  ./src/null_window.c
+		  ./src/null_window.c\
+		  ./src/null_joystick.c
 
 # linux, BSD, etc.
 CFLAGS += -D_GLFW_X11 -D_POSIX_C_SOURCE=200809L
@@ -36,7 +37,8 @@ SOURCES += ./src/posix_module.c\
 			./src/x11_window.c\
 			./src/xkb_unicode.c\
 			./src/glx_context.c\
-			./src/posix_poll.c
+			./src/posix_poll.c\
+			./src/linux_joystick.c
 
 OBJS = $(addprefix $(OBJDIR)/, $(addsuffix .o, $(basename $(notdir $(SOURCES)))))
 
