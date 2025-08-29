@@ -3613,6 +3613,33 @@ int main(int argc, char** argv)
     style.ScrollbarRounding = 2.0f;
     style.TabRounding = 2.0f;
 
+    // change font data before it gets locked with NewFrame
+    // TODO: reloading both fonts when source font changes, might change to font scaling
+    // instead
+    gui.change_font = false;
+    io.Fonts->Clear();
+    ImGui_ImplOpenGL2_DestroyFontsTexture();
+
+    const auto LoadFont = [&io](float font_size) -> ImFont* {
+        ImFontConfig cfg = {};
+        cfg.FontDataOwnedByAtlas = false; // static memory
+        ImFont* result = io.Fonts->AddFontFromMemoryTTF(
+            liberation_mono_ttf, sizeof(liberation_mono_ttf), font_size, &cfg);
+
+        if (result == NULL)
+            PrintError("error loading default font?!?!?");
+
+        return result;
+    };
+
+    gui.default_font = LoadFont(gui.font_size);
+    gui.source_font = LoadFont(gui.source_font_size);
+
+    if (gui.default_font == NULL || gui.source_font == NULL)
+        return EXIT_FAILURE;
+
+    ImGui_ImplOpenGL2_CreateFontsTexture();
+
     // Main loop
     while (!glfwWindowShouldClose(gui.window)) {
         // Poll and handle events (inputs, window resize, etc.)
@@ -3630,48 +3657,6 @@ int main(int argc, char** argv)
         }
 
         glfwPollEvents();
-
-        if (gui.change_font) {
-            // change font data before it gets locked with NewFrame
-            // TODO: reloading both fonts when source font changes, might change to font scaling
-            // instead
-            gui.change_font = false;
-            io.Fonts->Clear();
-            ImGui_ImplOpenGL2_DestroyFontsTexture();
-
-            const auto LoadFont = [&io](bool use_default_font, float font_size) -> ImFont* {
-                ImFont* result = NULL;
-                if (!use_default_font) {
-                    result = io.Fonts->AddFontFromFileTTF(gui.font_filename.c_str(), font_size);
-                    if (result == NULL) {
-                        // fallback to default
-                        use_default_font = true;
-                        font_size = DEFAULT_FONT_SIZE;
-                        PrintErrorf("error loading font %s, reverting to default...\n",
-                            gui.font_filename.c_str());
-                    }
-                }
-
-                if (use_default_font) {
-                    ImFontConfig cfg = {};
-                    cfg.FontDataOwnedByAtlas = false; // static memory
-                    result = io.Fonts->AddFontFromMemoryTTF(
-                        liberation_mono_ttf, sizeof(liberation_mono_ttf), font_size, &cfg);
-                    if (result == NULL)
-                        PrintError("error loading default font?!?!?");
-                }
-
-                return result;
-            };
-
-            gui.default_font = LoadFont(gui.use_default_font, gui.font_size);
-            gui.source_font = LoadFont(gui.use_default_font, gui.source_font_size);
-
-            if (gui.default_font == NULL || gui.source_font == NULL)
-                break;
-
-            ImGui_ImplOpenGL2_CreateFontsTexture();
-        }
 
         // Start the Dear ImGui frame
         ImGui_ImplOpenGL2_NewFrame();
